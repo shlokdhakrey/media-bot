@@ -1,0 +1,84 @@
+{
+  "compilerOptions": {
+    // Target modern Node.js runtime
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    
+    // Output configuration
+    "outDir": "./dist",
+    "rootDir": ".",
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": true,
+    
+    // Strict type checking - non-negotiable for production
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "useUnknownInCatchVariables": true,
+    "alwaysStrict": true,
+    
+    // Additional safety checks
+    // TODO: Re-enable noUnusedLocals after cleanup
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    // TODO: Re-enable noUncheckedIndexedAccess after cleanup
+    "noUncheckedIndexedAccess": false,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": false,
+    
+    // Module interop
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    
+    // Build optimizations
+    "skipLibCheck": true,
+    "incremental": true,
+    
+    // Path aliases for monorepo
+    "baseUrl": ".",
+    "paths": {
+      "@media-bot/core": ["packages/core/src"],
+      "@media-bot/core/*": ["packages/core/src/*"],
+      "@media-bot/acquisition": ["packages/acquisition/src"],
+      "@media-bot/acquisition/*": ["packages/acquisition/src/*"],
+      "@media-bot/media": ["packages/media/src"],
+      "@media-bot/media/*": ["packages/media/src/*"],
+      "@media-bot/sync": ["packages/sync/src"],
+      "@media-bot/sync/*": ["packages/sync/src/*"],
+      "@media-bot/processing": ["packages/processing/src"],
+      "@media-bot/processing/*": ["packages/processing/src/*"],
+      "@media-bot/validation": ["packages/validation/src"],
+      "@media-bot/validation/*": ["packages/validation/src/*"],
+      "@media-bot/packaging": ["packages/packaging/src"],
+      "@media-bot/packaging/*": ["packages/packaging/src/*"],
+      "@media-bot/upload": ["packages/upload/src"],
+      "@media-bot/upload/*": ["packages/upload/src/*"],
+      "@media-bot/utils": ["packages/utils/src"],
+      "@media-bot/utils/*": ["packages/utils/src/*"]
+    }
+  },
+  "include": [
+    "apps/**/*.ts",
+    "packages/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/node_modules",
+    "**/dist",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
+}

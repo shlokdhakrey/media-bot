@@ -1,0 +1,20 @@
+# Processed Storage
+
+This directory contains successfully processed and packaged media.
+
+## Structure
+
+- `{job-id}/` - Each completed job
+  - `final/` - Final muxed output
+  - `manifest.json` - Job manifest with all metadata
+
+## Workflow
+
+Files wait here for:
+1. Upload to MinIO/GDrive
+2. User download via admin panel
+3. Manual archival
+
+## Cleanup
+
+After upload, files are moved to `../archive/` based on retention policy.

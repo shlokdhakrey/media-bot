@@ -1,0 +1,13 @@
+# Windows Binaries
+
+Place your Windows binaries (.exe files) here:
+
+- ffmpeg.exe
+- ffprobe.exe
+- mkvmerge.exe
+- mkvextract.exe
+- mediainfo.exe
+- rclone.exe
+- aria2c.exe
+- alass.exe
+- subsync.exe

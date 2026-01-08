@@ -1,0 +1,38 @@
+{
+  "name": "@media-bot/worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Background job processor - executes downloads, media analysis, sync, processing, and uploads",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@media-bot/acquisition": "workspace:*",
+    "@media-bot/core": "workspace:*",
+    "@media-bot/media": "workspace:*",
+    "@media-bot/packaging": "workspace:*",
+    "@media-bot/processing": "workspace:*",
+    "@media-bot/sync": "workspace:*",
+    "@media-bot/utils": "workspace:*",
+    "@media-bot/validation": "workspace:*",
+    "@prisma/client": "^5.7.0",
+    "bullmq": "^5.1.0",
+    "dotenv": "^17.2.3",
+    "ioredis": "^5.3.2",
+    "pino": "^8.17.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "rimraf": "^5.0.5",
+    "tsx": "^4.6.0",
+    "typescript": "^5.3.0"
+  }
+}

@@ -1,0 +1,409 @@
+# ============================================================================
+# MEDIA-BOT .GITIGNORE
+# Comprehensive gitignore for pnpm monorepo with TypeScript
+# ============================================================================
+
+# ============================================================================
+# DEPENDENCIES
+# ============================================================================
+
+# Node modules (all workspaces)
+node_modules/
+**/node_modules/
+
+# pnpm
+.pnpm-debug.log
+pnpm-debug.log*
+
+# Yarn (in case of migration)
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.yarnrc.yml
+
+# npm
+package-lock.json
+npm-debug.log*
+.npm/
+
+# Plug'n'Play (if ever used)
+.pnp
+.pnp.js
+.pnp.cjs
+
+# ============================================================================
+# BUILD OUTPUTS
+# ============================================================================
+
+# TypeScript build outputs
+dist/
+**/dist/
+build/
+**/build/
+out/
+**/out/
+
+# TypeScript incremental compilation
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# Turborepo
+.turbo/
+**/.turbo/
+
+# Bundler outputs
+.next/
+.nuxt/
+.output/
+.vercel/
+.netlify/
+
+# ============================================================================
+# ENVIRONMENT & SECRETS
+# ============================================================================
+
+# Environment files (NEVER commit these)
+.env
+.env.*
+!.env.example
+!.env.template
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.test
+
+# Secret keys
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Service account files
+*-service-account.json
+service-account*.json
+credentials.json
+
+# ============================================================================
+# IDE & EDITORS
+# ============================================================================
+
+# VS Code
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.code-workspace
+
+# JetBrains (WebStorm, IntelliJ)
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Vim/Neovim
+*.swp
+*.swo
+*.swn
+*~
+.vim/
+.nvim/
+Session.vim
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+.#*
+*.elc
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ============================================================================
+# OPERATING SYSTEM
+# ============================================================================
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+.AppleDouble
+.LSOverride
+Icon?
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+*.stackdump
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ============================================================================
+# LOGS
+# ============================================================================
+
+# Log files
+logs/
+**/logs/
+*.log
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnpm-debug.log
+
+# Runtime logs
+ffmpeg-*.log
+mkvmerge-*.log
+
+# ============================================================================
+# RUNTIME & TEMPORARY
+# ============================================================================
+
+# Process IDs
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+.temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Cache
+.cache/
+**/.cache/
+*.cache
+
+# ============================================================================
+# TESTING & COVERAGE
+# ============================================================================
+
+# Test coverage
+coverage/
+**/coverage/
+.nyc_output/
+*.lcov
+
+# Test outputs
+*.test.output
+test-results/
+junit.xml
+test-report.xml
+
+# Playwright
+playwright-report/
+playwright/.cache/
+test-results/
+
+# Jest
+jest-report/
+
+# ============================================================================
+# PRISMA & DATABASE
+# ============================================================================
+
+# Prisma migration locks (auto-generated)
+prisma/migrations/**/migration_lock.toml
+
+# SQLite databases (if used for dev)
+*.db
+*.sqlite
+*.sqlite3
+
+# Database dumps
+*.sql.gz
+*.dump
+
+# ============================================================================
+# STORAGE (Local Development Data)
+# ============================================================================
+
+# Downloaded files
+storage/incoming/*
+!storage/incoming/.gitkeep
+
+# Working directory
+storage/working/*
+!storage/working/.gitkeep
+
+# Processed files
+storage/processed/*
+!storage/processed/.gitkeep
+
+# Sample files
+storage/samples/*
+!storage/samples/.gitkeep
+
+# Failed job artifacts
+storage/failed/*
+!storage/failed/.gitkeep
+
+# Archived files
+storage/archive/*
+!storage/archive/.gitkeep
+
+# Media files (never commit these)
+*.mkv
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.flv
+*.webm
+*.mka
+*.m4a
+*.mp3
+*.wav
+*.flac
+*.aac
+*.ac3
+*.eac3
+*.dts
+*.opus
+*.ogg
+
+# ============================================================================
+# DOCKER
+# ============================================================================
+
+# Docker volumes (if mounted locally)
+docker/postgres/data/
+docker/redis/data/
+docker/minio/data/
+docker/**/data/
+
+# Docker override files
+docker-compose.override.yml
+docker-compose.*.yml
+!docker-compose.yml
+!docker-compose.prod.yml
+!docker-compose.dev.yml
+
+# ============================================================================
+# BINARIES & EXECUTABLES
+# ============================================================================
+
+# Compiled binaries
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Keep binary folder structure but not binaries themselves
+packages/core/binaries/windows/*
+!packages/core/binaries/windows/.gitkeep
+packages/core/binaries/linux/*
+!packages/core/binaries/linux/.gitkeep
+packages/core/binaries/darwin/*
+!packages/core/binaries/darwin/.gitkeep
+
+# ============================================================================
+# MISC
+# ============================================================================
+
+# Diagnostic reports
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Snowpack
+web_modules/
+
+# FuseBox
+.fusebox/
+
+# DynamoDB Local
+.dynamodb/
+
+# Serverless
+.serverless/
+
+# TernJS
+.tern-port
+
+# Parcel
+.parcel-cache/
+
+# TypeDoc
+docs/api/
+
+# Storybook
+storybook-static/
+
+# Husky
+.husky/_/
+
+# ============================================================================
+# PROJECT-SPECIFIC
+# ============================================================================
+
+# Debug artifacts
+debug/
+*.debug
+
+# Benchmark results
+benchmarks/results/
+
+# Generated manifests
+manifests/
+*.manifest.json
+
+# Temporary downloads
+downloads/
+*.part
+*.crdownload
+*.download
+
+# FFmpeg temp files
+ffmpeg2pass-*
+*.ffindex
+
+# MKVMerge temp files
+*.chapters.txt.tmp
+
+# Rclone config (if stored locally)
+rclone.conf
+
+# Aria2 session files
+*.aria2
+
+# qBittorrent temp
+*.!qB

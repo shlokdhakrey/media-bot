@@ -1,0 +1,19 @@
+# Archive Storage
+
+This directory contains archived processed media.
+
+## Purpose
+
+Long-term storage after upload completion.
+Can be used for re-upload or re-processing.
+
+## Structure
+
+- `{year}/`
+  - `{month}/`
+    - `{job-id}/`
+
+## Retention
+
+Archives can be pruned based on disk space.
+Manifests are kept even if media is deleted.

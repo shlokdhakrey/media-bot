@@ -1,0 +1,15 @@
+# Working Storage
+
+This directory contains files actively being processed.
+
+## Structure
+
+- `{job-id}/` - Each job gets its own subdirectory
+  - `video/` - Video files being processed
+  - `audio/` - Audio files being processed
+  - `subs/` - Subtitle files
+  - `temp/` - Temporary processing files
+
+## Cleanup
+
+Job directories are moved to `../processed/` or `../failed/` on completion.

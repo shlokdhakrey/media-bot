@@ -1,0 +1,24 @@
+{
+  "name": "@media-bot/packaging",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Output packaging - final file organization and manifest generation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@media-bot/core": "workspace:*",
+    "@media-bot/utils": "workspace:*",
+    "pino": "^8.17.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "rimraf": "^5.0.5"
+  }
+}

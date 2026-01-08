@@ -1,0 +1,15 @@
+# macOS Binaries
+
+Place your macOS binaries here:
+
+- ffmpeg
+- ffprobe
+- mkvmerge
+- mkvextract
+- mediainfo
+- rclone
+- aria2c
+- alass
+- subsync
+
+Remember to make them executable: chmod +x *

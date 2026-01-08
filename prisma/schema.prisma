@@ -1,0 +1,509 @@
+// ============================================
+// MEDIA-BOT DATABASE SCHEMA
+// ============================================
+// 
+// Design Principles:
+// - Every action must be auditable
+// - Job state machine is strictly enforced
+// - Media metadata stored as JSON for flexibility
+// - FFmpeg command history preserved for debugging
+// - Relationships are explicit but not over-normalized
+//
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER MANAGEMENT
+// ============================================
+// Users can be admins, regular users, or readonly
+// Authentication is handled externally (API key, Telegram, etc.)
+
+model User {
+  id          String   @id @default(uuid())
+  username    String   @unique
+  role        UserRole @default(USER)
+  
+  // Optional external identifiers
+  email       String?  @unique
+  telegramId  String?  @unique
+  
+  // User preferences stored as JSON for flexibility
+  preferences Json     @default("{}")
+  
+  // Status
+  isActive    Boolean  @default(true)
+  lastActiveAt DateTime?
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relationships
+  jobs        Job[]
+  auditLogs   AuditLog[]
+  
+  @@index([username])
+  @@index([telegramId])
+}
+
+enum UserRole {
+  ADMIN
+  USER
+  READONLY
+}
+
+// ============================================
+// JOB MANAGEMENT
+// ============================================
+// Jobs are the core workflow unit
+// State machine is enforced at the application level
+// Every state change is recorded in stateHistory
+
+model Job {
+  id          String    @id @default(uuid())
+  
+  // Job type determines the workflow
+  type        JobType
+  
+  // Current state (enforced by state machine)
+  state       JobState  @default(PENDING)
+  
+  // Source information
+  source      String    // URL, magnet, etc.
+  priority    Priority  @default(NORMAL)
+  
+  // Progress tracking (0-100)
+  progress    Int       @default(0)
+  
+  // Configuration options stored as JSON
+  options     Json      @default("{}")
+  
+  // State transition history for auditing
+  // Each entry: { from, to, timestamp, reason, metadata }
+  stateHistory Json[]   @default([])
+  
+  // Error tracking
+  error       String?
+  retryCount  Int       @default(0)
+  
+  // Timing
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relationships
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  
+  mediaAssets MediaAsset[]
+  downloads   Download[]
+  syncDecisions SyncDecision[]
+  processingSteps ProcessingStep[]
+  auditLogs   AuditLog[]
+  
+  @@index([state])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+enum JobType {
+  DOWNLOAD    // Download only
+  SYNC        // Sync audio only
+  PROCESS     // Process/mux only
+  UPLOAD      // Upload only
+  FULL        // Complete pipeline
+}
+
+enum JobState {
+  PENDING
+  DOWNLOADING
+  ANALYZING
+  SYNCING
+  PROCESSING
+  VALIDATING
+  PACKAGED
+  UPLOADED
+  DONE
+  FAILED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+}
+
+// ============================================
+// MEDIA ASSETS
+// ============================================
+// Represents a media file at any stage of processing
+// Metadata is comprehensive and stored as JSON
+
+model MediaAsset {
+  id          String    @id @default(uuid())
+  
+  // File information
+  fileName    String
+  filePath    String
+  fileSize    BigInt
+  
+  // Type classification
+  type        AssetType
+  
+  // Hashes for integrity
+  md5         String?
+  sha1        String?
+  sha256      String?
+  
+  // Comprehensive metadata from ffprobe/mediainfo
+  // Includes: streams, codecs, timing, chapters, etc.
+  metadata    Json      @default("{}")
+  
+  // Raw probe output for reference
+  rawFFProbe  Json?
+  rawMediaInfo Json?
+  
+  // Status
+  status      AssetStatus @default(PENDING)
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relationships
+  jobId       String
+  job         Job       @relation(fields: [jobId], references: [id])
+  
+  // Self-referential for derived assets
+  parentId    String?
+  parent      MediaAsset? @relation("DerivedAssets", fields: [parentId], references: [id])
+  derivedAssets MediaAsset[] @relation("DerivedAssets")
+  
+  syncDecisions SyncDecision[]
+  auditLogs   AuditLog[]
+  
+  @@index([jobId])
+  @@index([type])
+  @@index([status])
+}
+
+enum AssetType {
+  VIDEO
+  AUDIO
+  SUBTITLE
+  SAMPLE
+  PACKAGE
+  OTHER
+}
+
+enum AssetStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+  ARCHIVED
+}
+
+// ============================================
+// DOWNLOADS
+// ============================================
+// Tracks download attempts and progress
+
+model Download {
+  id          String    @id @default(uuid())
+  
+  // Source information
+  source      String
+  linkType    LinkType
+  downloader  DownloaderType
+  
+  // Progress and status
+  status      DownloadStatus @default(PENDING)
+  progress    Int       @default(0)
+  speed       BigInt?   // bytes per second
+  eta         Int?      // seconds remaining
+  
+  // Output information
+  outputPath  String?
+  totalSize   BigInt?
+  
+  // Downloader-specific ID
+  externalId  String?
+  
+  // Error tracking
+  error       String?
+  retryCount  Int       @default(0)
+  
+  // Timestamps
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relationships
+  jobId       String
+  job         Job       @relation(fields: [jobId], references: [id])
+  
+  @@index([jobId])
+  @@index([status])
+}
+
+enum LinkType {
+  MAGNET
+  TORRENT
+  HTTP
+  HTTPS
+  GDRIVE
+  NZB
+  DIRECT
+  UNKNOWN
+}
+
+enum DownloaderType {
+  QBITTORRENT
+  ARIA2
+  RCLONE
+  NZBGET
+}
+
+enum DownloadStatus {
+  PENDING
+  DOWNLOADING
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// ============================================
+// SYNC DECISIONS
+// ============================================
+// Records all sync analysis and correction decisions
+// Critical for auditing and debugging sync issues
+
+model SyncDecision {
+  id          String    @id @default(uuid())
+  
+  // What was analyzed
+  videoAssetId String
+  audioAssetId String?
+  
+  // Decision outcome
+  needsCorrection Boolean
+  correctionType CorrectionType?
+  
+  // Correction parameters (stored as JSON)
+  // e.g., { delayMs: 150 } or { tempoFactor: 1.001 }
+  correctionParams Json?
+  
+  // Full analysis data
+  // Includes: silence detection, anchor points, verification
+  analysisData Json
+  
+  // Confidence in the decision (0-100)
+  confidence  Int
+  
+  // Was this decision applied?
+  wasApplied  Boolean   @default(false)
+  appliedAt   DateTime?
+  
+  // Manual override flag
+  isManualOverride Boolean @default(false)
+  overrideReason String?
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  
+  // Relationships
+  jobId       String
+  job         Job       @relation(fields: [jobId], references: [id])
+  
+  videoAsset  MediaAsset @relation(fields: [videoAssetId], references: [id])
+  
+  @@index([jobId])
+}
+
+enum CorrectionType {
+  NONE
+  DELAY
+  STRETCH
+  TRIM
+  PAD
+  REJECT
+}
+
+// ============================================
+// PROCESSING STEPS
+// ============================================
+// Records every processing step for a job
+// Critical for debugging and reproducing issues
+
+model ProcessingStep {
+  id          String    @id @default(uuid())
+  
+  // What step
+  type        ProcessingType
+  order       Int       // Execution order
+  
+  // Status
+  status      ProcessingStatus @default(PENDING)
+  
+  // Command executed
+  command     String?
+  commandArgs String[]  @default([])
+  
+  // Output capture
+  stdout      String?   @db.Text
+  stderr      String?   @db.Text
+  exitCode    Int?
+  
+  // Duration
+  startedAt   DateTime?
+  completedAt DateTime?
+  durationMs  Int?
+  
+  // Error
+  error       String?
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  
+  // Relationships
+  jobId       String
+  job         Job       @relation(fields: [jobId], references: [id])
+  
+  @@index([jobId])
+  @@index([type])
+}
+
+enum ProcessingType {
+  PROBE
+  SILENCE_DETECT
+  ANCHOR_DETECT
+  SYNC_ANALYZE
+  MUX
+  VALIDATE
+  SAMPLE_GEN
+  HASH_GEN
+  PACKAGE
+  UPLOAD
+}
+
+enum ProcessingStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+// ============================================
+// AUDIT LOG
+// ============================================
+// EVERY significant action must be logged here
+// This is the source of truth for what happened
+
+model AuditLog {
+  id          String    @id @default(uuid())
+  
+  // What happened
+  action      AuditAction
+  message     String
+  
+  // Severity
+  level       LogLevel  @default(INFO)
+  
+  // Context (optional relationships)
+  jobId       String?
+  userId      String?
+  mediaAssetId String?
+  
+  // Additional context as JSON
+  metadata    Json      @default("{}")
+  
+  // For command executions
+  command     String?   @db.Text
+  commandOutput String? @db.Text
+  exitCode    Int?
+  
+  // Timestamp
+  createdAt   DateTime  @default(now())
+  
+  // Relationships (optional)
+  job         Job?      @relation(fields: [jobId], references: [id])
+  user        User?     @relation(fields: [userId], references: [id])
+  mediaAsset  MediaAsset? @relation(fields: [mediaAssetId], references: [id])
+  
+  @@index([action])
+  @@index([jobId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([level])
+}
+
+enum AuditAction {
+  // Job lifecycle
+  JOB_CREATED
+  JOB_STATE_CHANGED
+  JOB_FAILED
+  JOB_COMPLETED
+  JOB_CANCELLED
+  
+  // Download events
+  DOWNLOAD_STARTED
+  DOWNLOAD_PROGRESS
+  DOWNLOAD_COMPLETED
+  DOWNLOAD_FAILED
+  
+  // Media analysis
+  MEDIA_ANALYZED
+  MEDIA_PROBE_FAILED
+  
+  // Sync events
+  SYNC_ANALYSIS_STARTED
+  SYNC_DECISION_MADE
+  SYNC_CORRECTION_APPLIED
+  SYNC_REJECTED
+  
+  // Processing
+  PROCESSING_STARTED
+  PROCESSING_COMPLETED
+  FFMPEG_COMMAND_EXECUTED
+  
+  // Validation
+  VALIDATION_STARTED
+  VALIDATION_PASSED
+  VALIDATION_FAILED
+  
+  // Upload
+  UPLOAD_STARTED
+  UPLOAD_COMPLETED
+  UPLOAD_FAILED
+  
+  // User events
+  USER_CREATED
+  USER_UPDATED
+  USER_LOGIN
+  
+  // System events
+  CONFIG_CHANGED
+  SYSTEM_ERROR
+  SYSTEM_WARNING
+}
+
+enum LogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}

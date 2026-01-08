@@ -1,0 +1,14 @@
+# Incoming Media Storage
+
+This directory stores media files immediately after download, before any processing.
+
+## Workflow
+
+1. Downloader completes → file moved here
+2. Media analysis runs on files in this directory
+3. After analysis → files moved to `../working/`
+
+## Cleanup
+
+Files are automatically moved out after analysis.
+Stale files (>24h) should be investigated for failed jobs.

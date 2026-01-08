@@ -1,0 +1,19 @@
+# Sample Storage
+
+This directory contains generated samples for validation.
+
+## Sample Types
+
+- `{job-id}_sample_{start}s-{end}s.{ext}` - Validation samples
+- `{job-id}_thumbnail_{time}s.jpg` - Thumbnails (if enabled)
+
+## Purpose
+
+1. Quick validation without downloading full files
+2. Sync verification samples
+3. User preview
+
+## Cleanup
+
+Samples are deleted after job completion and validation.
+Keep samples for failed jobs for debugging.

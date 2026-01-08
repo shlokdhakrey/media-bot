@@ -1,0 +1,21 @@
+# Failed Job Storage
+
+This directory contains files from failed jobs.
+
+## Purpose
+
+1. Debugging failed processing
+2. Manual recovery attempts
+3. Error analysis
+
+## Structure
+
+- `{job-id}/` - Original job directory
+  - All files from working directory
+  - `error.log` - Error details
+  - `state.json` - Job state at failure
+
+## Retention
+
+Failed jobs kept for 7 days by default.
+Investigate failures, then clean up or retry.

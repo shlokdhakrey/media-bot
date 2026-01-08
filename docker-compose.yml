@@ -1,0 +1,315 @@
+# ============================================
+# MEDIA-BOT DOCKER COMPOSE
+# ============================================
+# 
+# Production-grade media automation system
+# 
+# Usage:
+#   docker compose up -d              # Start all services
+#   docker compose up -d postgres redis minio  # Start infrastructure only
+#   docker compose logs -f worker     # Follow worker logs
+#   docker compose down               # Stop all services
+#
+# ============================================
+
+version: '3.8'
+
+services:
+  # ============================================
+  # DATABASE
+  # ============================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: media-bot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-media_bot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-media_bot_password}
+      POSTGRES_DB: ${POSTGRES_DB:-media_bot}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-media_bot} -d ${POSTGRES_DB:-media_bot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - media-bot-network
+
+  # ============================================
+  # REDIS (Queue & Cache)
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: media-bot-redis
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - redis_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - media-bot-network
+
+  # ============================================
+  # MINIO (S3-Compatible Object Storage)
+  # ============================================
+  minio:
+    image: minio/minio:latest
+    container_name: media-bot-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - media-bot-network
+
+  # ============================================
+  # QBITTORRENT (Torrent Downloads)
+  # ============================================
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: media-bot-qbittorrent
+    restart: unless-stopped
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: ${TZ:-UTC}
+      WEBUI_PORT: 8080
+    volumes:
+      - qbittorrent_config:/config
+      - ./storage/incoming:/downloads
+    ports:
+      - "${QBITTORRENT_WEBUI_PORT:-8080}:8080"
+      - "${QBITTORRENT_PORT:-6881}:6881"
+      - "${QBITTORRENT_PORT:-6881}:6881/udp"
+    networks:
+      - media-bot-network
+
+  # ============================================
+  # ARIA2 (HTTP/FTP Downloads)
+  # ============================================
+  aria2:
+    image: p3terx/aria2-pro
+    container_name: media-bot-aria2
+    restart: unless-stopped
+    environment:
+      PUID: 1000
+      PGID: 1000
+      RPC_SECRET: ${ARIA2_RPC_SECRET:-your_aria2_secret}
+      RPC_PORT: 6800
+    volumes:
+      - aria2_config:/config
+      - ./storage/incoming:/downloads
+    ports:
+      - "${ARIA2_RPC_PORT:-6800}:6800"
+    networks:
+      - media-bot-network
+
+  # ============================================
+  # NZBGET (Usenet Downloads)
+  # ============================================
+  nzbget:
+    image: lscr.io/linuxserver/nzbget:latest
+    container_name: media-bot-nzbget
+    restart: unless-stopped
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: ${TZ:-UTC}
+    volumes:
+      - nzbget_config:/config
+      - ./storage/incoming:/downloads
+    ports:
+      - "${NZBGET_PORT:-6789}:6789"
+    networks:
+      - media-bot-network
+
+  # ============================================
+  # API SERVER
+  # ============================================
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: media-bot-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-media_bot}:${POSTGRES_PASSWORD:-media_bot_password}@postgres:5432/${POSTGRES_DB:-media_bot}
+      REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      API_PORT: 3000
+    volumes:
+      - ./storage:/app/storage
+      - ./logs:/app/logs
+    ports:
+      - "${API_PORT:-3000}:3000"
+    networks:
+      - media-bot-network
+
+  # ============================================
+  # WORKER (Job Processor)
+  # ============================================
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    container_name: media-bot-worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      WORKER_ID: worker-1
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-media_bot}:${POSTGRES_PASSWORD:-media_bot_password}@postgres:5432/${POSTGRES_DB:-media_bot}
+      REDIS_URL: redis://redis:6379
+      # Storage paths
+      STORAGE_INCOMING: /app/storage/incoming
+      STORAGE_WORKING: /app/storage/working
+      STORAGE_PROCESSED: /app/storage/processed
+      STORAGE_SAMPLES: /app/storage/samples
+      STORAGE_FAILED: /app/storage/failed
+      # Download clients
+      QBITTORRENT_URL: http://qbittorrent:8080
+      QBITTORRENT_USERNAME: ${QBITTORRENT_USERNAME:-admin}
+      QBITTORRENT_PASSWORD: ${QBITTORRENT_PASSWORD:-adminadmin}
+      ARIA2_RPC_URL: http://aria2:6800/jsonrpc
+      ARIA2_RPC_SECRET: ${ARIA2_RPC_SECRET:-your_aria2_secret}
+      NZBGET_URL: http://nzbget:6789
+      NZBGET_USERNAME: ${NZBGET_USERNAME:-nzbget}
+      NZBGET_PASSWORD: ${NZBGET_PASSWORD:-tegbzn6789}
+      # Media tools (in container)
+      FFMPEG_PATH: /usr/bin/ffmpeg
+      FFPROBE_PATH: /usr/bin/ffprobe
+      MEDIAINFO_PATH: /usr/bin/mediainfo
+      MKVMERGE_PATH: /usr/bin/mkvmerge
+      MKVPROPEDIT_PATH: /usr/bin/mkvpropedit
+      # Job settings
+      JOB_TIMEOUT_MS: ${JOB_TIMEOUT_MS:-3600000}
+      HEALTH_CHECK_PORT: 3001
+    volumes:
+      - ./storage:/app/storage
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/live"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '1'
+          memory: 2G
+    networks:
+      - media-bot-network
+
+  # ============================================
+  # WORKER 2 (Additional Worker for Scaling)
+  # ============================================
+  worker-2:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    container_name: media-bot-worker-2
+    restart: unless-stopped
+    profiles:
+      - scale  # Only starts with: docker compose --profile scale up
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      WORKER_ID: worker-2
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-media_bot}:${POSTGRES_PASSWORD:-media_bot_password}@postgres:5432/${POSTGRES_DB:-media_bot}
+      REDIS_URL: redis://redis:6379
+      STORAGE_INCOMING: /app/storage/incoming
+      STORAGE_WORKING: /app/storage/working
+      STORAGE_PROCESSED: /app/storage/processed
+      STORAGE_SAMPLES: /app/storage/samples
+      STORAGE_FAILED: /app/storage/failed
+      QBITTORRENT_URL: http://qbittorrent:8080
+      QBITTORRENT_USERNAME: ${QBITTORRENT_USERNAME:-admin}
+      QBITTORRENT_PASSWORD: ${QBITTORRENT_PASSWORD:-adminadmin}
+      ARIA2_RPC_URL: http://aria2:6800/jsonrpc
+      ARIA2_RPC_SECRET: ${ARIA2_RPC_SECRET:-your_aria2_secret}
+      NZBGET_URL: http://nzbget:6789
+      FFMPEG_PATH: /usr/bin/ffmpeg
+      FFPROBE_PATH: /usr/bin/ffprobe
+      MEDIAINFO_PATH: /usr/bin/mediainfo
+      MKVMERGE_PATH: /usr/bin/mkvmerge
+      JOB_TIMEOUT_MS: ${JOB_TIMEOUT_MS:-3600000}
+      HEALTH_CHECK_PORT: 3001
+    volumes:
+      - ./storage:/app/storage
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/live"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+    networks:
+      - media-bot-network
+
+# ============================================
+# NETWORKS
+# ============================================
+networks:
+  media-bot-network:
+    driver: bridge
+
+# ============================================
+# VOLUMES
+# ============================================
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  qbittorrent_config:
+  aria2_config:
+  nzbget_config:
