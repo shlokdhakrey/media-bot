@@ -6,11 +6,24 @@
  */
 
 import { config as dotenvConfig } from 'dotenv';
-import { resolve } from 'path';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { z } from 'zod';
 
-// Load .env from project root
-dotenvConfig({ path: resolve(process.cwd(), '../../.env') });
+// Get monorepo root
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const monorepoRoot = resolve(__dirname, '../../../..');
+
+// Load .env from monorepo root
+dotenvConfig({ path: resolve(monorepoRoot, '.env') });
+
+// Helper to resolve relative paths from monorepo root
+function resolvePath(p: string): string {
+  if (p.startsWith('./') || p.startsWith('../')) {
+    return resolve(monorepoRoot, p);
+  }
+  return p;
+}
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -40,10 +53,10 @@ const envSchema = z.object({
   ARIA2_RPC_URL: z.string().optional(),
   NZBGET_URL: z.string().optional(),
   
-  // Paths
+  // Paths (relative to monorepo root)
   STORAGE_PATH: z.string().default('./storage'),
   LOGS_PATH: z.string().default('./logs'),
-  TEMP_PATH: z.string().default('./temp'),
+  TEMP_PATH: z.string().default('./storage/temp'),
   
   // Binary paths
   FFMPEG_PATH: z.string().default('ffmpeg'),
@@ -63,7 +76,7 @@ const envSchema = z.object({
 const parseResult = envSchema.safeParse(process.env);
 
 if (!parseResult.success) {
-  console.error('❌ Invalid environment configuration:');
+  console.error('Invalid environment configuration:');
   console.error(parseResult.error.format());
   process.exit(1);
 }
@@ -103,9 +116,9 @@ export const config = {
   nzbgetUrl: env.NZBGET_URL,
   
   // Paths
-  storagePath: env.STORAGE_PATH,
-  logsPath: env.LOGS_PATH,
-  tempPath: env.TEMP_PATH,
+  storagePath: resolvePath(env.STORAGE_PATH),
+  logsPath: resolvePath(env.LOGS_PATH),
+  tempPath: resolvePath(env.TEMP_PATH),
   
   // Binaries
   ffmpegPath: env.FFMPEG_PATH,

@@ -139,10 +139,10 @@ async function downloadFile(
     try {
       // Get metadata first
       const metadata = await gdrive.getFileMetadata(fileId);
-      onProgress?.(`📥 Downloading: ${metadata.name} (${formatSize(parseInt(metadata.size))})`);
+      onProgress?.(`[DL] Downloading: ${metadata.name} (${formatSize(parseInt(metadata.size))})`);
 
       gdrive.on('progress', (progress: GDriveProgress) => {
-        onProgress?.(`📥 ${metadata.name}: ${progress.percentage}% (${formatSpeed(progress.speed)})`);
+        onProgress?.(`[DL] ${metadata.name}: ${progress.percentage}% (${formatSpeed(progress.speed)})`);
       });
 
       const result = await gdrive.downloadFile(link, outputDir);
@@ -163,7 +163,7 @@ async function downloadFile(
   // HTTP download using fetch + streaming
   if (linkType === 'http') {
     try {
-      onProgress?.(`📥 Fetching: ${link}`);
+      onProgress?.(`[DL] Fetching: ${link}`);
       
       const response = await fetch(link);
       if (!response.ok) {
@@ -201,7 +201,7 @@ async function downloadFile(
           downloaded += chunk.length;
           if (totalBytes > 0 && downloaded % (1024 * 1024) < chunk.length) {
             const pct = Math.round((downloaded / totalBytes) * 100);
-            onProgress?.(`📥 ${fileName}: ${pct}%`);
+            onProgress?.(`[DL] ${fileName}: ${pct}%`);
           }
           callback(null, chunk);
         }
@@ -539,18 +539,18 @@ export function registerProcessCommand(
 
     if (args.length < 2) {
       await ctx.reply(
-        `⚡ *All-Mighty Process Command*\n\n` +
+        `[PIPELINE] *All-Mighty Process Command*\n\n` +
         `Usage: \`/process "video_link" "audio_link"\`\n\n` +
         `*Supported Links:*\n` +
-        `• Google Drive: \`https://drive.google.com/file/d/...\`\n` +
-        `• Direct HTTP: \`https://example.com/file.mkv\`\n` +
-        `• Local path: \`C:\\Videos\\movie.mkv\`\n\n` +
+        `- Google Drive: \`https://drive.google.com/file/d/...\`\n` +
+        `- Direct HTTP: \`https://example.com/file.mkv\`\n` +
+        `- Local path: \`C:\\Videos\\movie.mkv\`\n\n` +
         `*What it does:*\n` +
-        `1️⃣ Downloads video & audio\n` +
-        `2️⃣ Analyzes FPS & duration\n` +
-        `3️⃣ Syncs audio (tempo + delay)\n` +
-        `4️⃣ Muxes into MKV\n` +
-        `5️⃣ Generates 30s sample\n\n` +
+        `1. Downloads video & audio\n` +
+        `2. Analyzes FPS & duration\n` +
+        `3. Syncs audio (tempo + delay)\n` +
+        `4. Muxes into MKV\n` +
+        `5. Generates 30s sample\n\n` +
         `*Example:*\n` +
         `\`/process "https://drive.google.com/file/d/abc123" "https://drive.google.com/file/d/xyz789"\``,
         { parse_mode: 'Markdown' }
@@ -562,10 +562,10 @@ export function registerProcessCommand(
     const audioLink = args[1];
 
     const progressMsg = await ctx.reply(
-      `⚡ *Starting Process Pipeline*\n\n` +
-      `📹 Video: ${videoLink.length > 50 ? videoLink.slice(0, 47) + '...' : videoLink}\n` +
-      `🎧 Audio: ${audioLink.length > 50 ? audioLink.slice(0, 47) + '...' : audioLink}\n\n` +
-      `⏳ Initializing...`,
+      `[PIPELINE] *Starting Process Pipeline*\n\n` +
+      `[VIDEO] Video: ${videoLink.length > 50 ? videoLink.slice(0, 47) + '...' : videoLink}\n` +
+      `[AUDIO] Audio: ${audioLink.length > 50 ? audioLink.slice(0, 47) + '...' : audioLink}\n\n` +
+      `(waiting) Initializing...`,
       { parse_mode: 'Markdown' }
     );
     const chatId = ctx.chat!.id;
@@ -599,9 +599,9 @@ export function registerProcessCommand(
       try {
         // ===== STEP 1: Download Video =====
         await updateStatus(
-          `⚡ *Process Pipeline*\n\n` +
-          `📹 *Step 1/5: Downloading Video...*\n` +
-          `⏳ Please wait...`
+          `[PIPELINE] *Process Pipeline*\n\n` +
+          `[VIDEO] *Step 1/5: Downloading Video...*\n` +
+          `(waiting) Please wait...`
         );
 
         const videoResult = await downloadFile(
@@ -610,8 +610,8 @@ export function registerProcessCommand(
           logger,
           async (msg) => {
             await updateStatus(
-              `⚡ *Process Pipeline*\n\n` +
-              `📹 *Step 1/5: Downloading Video*\n${msg}`
+              `[PIPELINE] *Process Pipeline*\n\n` +
+              `[VIDEO] *Step 1/5: Downloading Video*\n${msg}`
             );
           }
         );
@@ -624,10 +624,10 @@ export function registerProcessCommand(
 
         // ===== STEP 2: Download Audio =====
         await updateStatus(
-          `⚡ *Process Pipeline*\n\n` +
-          `✅ Video: \`${videoResult.fileName}\`\n\n` +
-          `🎧 *Step 2/5: Downloading Audio...*\n` +
-          `⏳ Please wait...`
+          `[PIPELINE] *Process Pipeline*\n\n` +
+          `[OK] Video: \`${videoResult.fileName}\`\n\n` +
+          `[AUDIO] *Step 2/5: Downloading Audio...*\n` +
+          `(waiting) Please wait...`
         );
 
         const audioResult = await downloadFile(
@@ -636,9 +636,9 @@ export function registerProcessCommand(
           logger,
           async (msg) => {
             await updateStatus(
-              `⚡ *Process Pipeline*\n\n` +
-              `✅ Video: \`${videoResult.fileName}\`\n\n` +
-              `🎧 *Step 2/5: Downloading Audio*\n${msg}`
+              `[PIPELINE] *Process Pipeline*\n\n` +
+              `[OK] Video: \`${videoResult.fileName}\`\n\n` +
+              `[AUDIO] *Step 2/5: Downloading Audio*\n${msg}`
             );
           }
         );
@@ -651,11 +651,11 @@ export function registerProcessCommand(
 
         // ===== STEP 3: Analyze & Sync =====
         await updateStatus(
-          `⚡ *Process Pipeline*\n\n` +
-          `✅ Video: \`${videoResult.fileName}\`\n` +
-          `✅ Audio: \`${audioResult.fileName}\`\n\n` +
-          `🔍 *Step 3/5: Analyzing & Syncing...*\n` +
-          `⏳ Detecting FPS and timing...`
+          `[PIPELINE] *Process Pipeline*\n\n` +
+          `[OK] Video: \`${videoResult.fileName}\`\n` +
+          `[OK] Audio: \`${audioResult.fileName}\`\n\n` +
+          `[SYNC] *Step 3/5: Analyzing & Syncing...*\n` +
+          `(waiting) Detecting FPS and timing...`
         );
 
         const syncResult = await analyzeSync(videoPath, audioPath, logger);
@@ -667,15 +667,15 @@ export function registerProcessCommand(
 
         if (syncResult.needsSync) {
           await updateStatus(
-            `⚡ *Process Pipeline*\n\n` +
-            `✅ Video: \`${videoResult.fileName}\`\n` +
-            `✅ Audio: \`${audioResult.fileName}\`\n\n` +
-            `🔍 *Step 3/5: Syncing Audio*\n` +
-            `FPS: ${syncResult.audioFps} ➔ ${syncResult.videoFps.toFixed(3)}\n` +
+            `[PIPELINE] *Process Pipeline*\n\n` +
+            `[OK] Video: \`${videoResult.fileName}\`\n` +
+            `[OK] Audio: \`${audioResult.fileName}\`\n\n` +
+            `[SYNC] *Step 3/5: Syncing Audio*\n` +
+            `FPS: ${syncResult.audioFps} -> ${syncResult.videoFps.toFixed(3)}\n` +
             `Tempo: ${syncResult.tempoFactor.toFixed(6)}\n` +
             `Delay: ${syncResult.delayMs}ms\n` +
             `Confidence: ${(syncResult.confidence * 100).toFixed(0)}%\n` +
-            `⏳ Processing...`
+            `(waiting) Processing...`
           );
 
           await syncAudio(
@@ -695,12 +695,12 @@ export function registerProcessCommand(
         muxedPath = join(workDir, `${videoBasename}.SYNCED.mkv`);
 
         await updateStatus(
-          `⚡ *Process Pipeline*\n\n` +
-          `✅ Video: \`${videoResult.fileName}\`\n` +
-          `✅ Audio: \`${audioResult.fileName}\`\n` +
-          `✅ Sync: ${syncResult.needsSync ? `Applied (${syncResult.tempoFactor.toFixed(4)}x, ${syncResult.delayMs}ms)` : 'Not needed'}\n\n` +
-          `📦 *Step 4/5: Muxing to MKV...*\n` +
-          `⏳ Creating final output...`
+          `[PIPELINE] *Process Pipeline*\n\n` +
+          `[OK] Video: \`${videoResult.fileName}\`\n` +
+          `[OK] Audio: \`${audioResult.fileName}\`\n` +
+          `[OK] Sync: ${syncResult.needsSync ? `Applied (${syncResult.tempoFactor.toFixed(4)}x, ${syncResult.delayMs}ms)` : 'Not needed'}\n\n` +
+          `[PKG] *Step 4/5: Muxing to MKV...*\n` +
+          `(waiting) Creating final output...`
         );
 
         await muxToMkv(
@@ -715,13 +715,13 @@ export function registerProcessCommand(
         samplePath = join(samplesDir, `${videoBasename}_sample.mp4`);
 
         await updateStatus(
-          `⚡ *Process Pipeline*\n\n` +
-          `✅ Video: \`${videoResult.fileName}\`\n` +
-          `✅ Audio: \`${audioResult.fileName}\`\n` +
-          `✅ Sync: Applied\n` +
-          `✅ Muxed: \`${basename(muxedPath)}\`\n\n` +
-          `🎬 *Step 5/5: Generating Sample...*\n` +
-          `⏳ Creating 30s preview...`
+          `[PIPELINE] *Process Pipeline*\n\n` +
+          `[OK] Video: \`${videoResult.fileName}\`\n` +
+          `[OK] Audio: \`${audioResult.fileName}\`\n` +
+          `[OK] Sync: Applied\n` +
+          `[OK] Muxed: \`${basename(muxedPath)}\`\n\n` +
+          `[SAMPLE] *Step 5/5: Generating Sample...*\n` +
+          `(waiting) Creating 30s preview...`
         );
 
         await generateSample(muxedPath, samplePath, logger);
@@ -737,25 +737,25 @@ export function registerProcessCommand(
         await ctx.api.editMessageText(
           chatId,
           msgId,
-          `✅ *Process Complete!*\n\n` +
-          `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-          `📹 *Video:* \`${videoResult.fileName}\`\n` +
-          `🎧 *Audio:* \`${audioResult.fileName}\`\n` +
-          `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-          `📊 *Sync Analysis:*\n` +
-          `├ Video FPS: ${syncResult.videoFps.toFixed(3)}\n` +
-          `├ Audio FPS: ${syncResult.audioFps}\n` +
-          `├ Tempo: ${syncResult.tempoFactor.toFixed(6)}x\n` +
-          `├ Delay: ${syncResult.delayMs}ms\n` +
-          `└ Confidence: ${(syncResult.confidence * 100).toFixed(0)}%\n\n` +
-          `📦 *Output:*\n` +
-          `├ File: \`${basename(muxedPath)}\`\n` +
-          `├ Size: ${formatSize(muxedStats.size)}\n` +
-          `└ Path: \`${dirname(muxedPath)}\`\n\n` +
-          `🎬 *Sample:*\n` +
-          `├ File: \`${basename(samplePath)}\`\n` +
-          `└ Size: ${formatSize(sampleStats.size)}\n\n` +
-          `⏱ Total Time: ${elapsed}s`,
+          `[OK] *Process Complete!*\n\n` +
+          `------------------------\n` +
+          `[VIDEO] *Video:* \`${videoResult.fileName}\`\n` +
+          `[AUDIO] *Audio:* \`${audioResult.fileName}\`\n` +
+          `------------------------\n\n` +
+          `[SYNC] *Sync Analysis:*\n` +
+          `| Video FPS: ${syncResult.videoFps.toFixed(3)}\n` +
+          `| Audio FPS: ${syncResult.audioFps}\n` +
+          `| Tempo: ${syncResult.tempoFactor.toFixed(6)}x\n` +
+          `| Delay: ${syncResult.delayMs}ms\n` +
+          `| Confidence: ${(syncResult.confidence * 100).toFixed(0)}%\n\n` +
+          `[PKG] *Output:*\n` +
+          `| File: \`${basename(muxedPath)}\`\n` +
+          `| Size: ${formatSize(muxedStats.size)}\n` +
+          `| Path: \`${dirname(muxedPath)}\`\n\n` +
+          `[SAMPLE] *Sample:*\n` +
+          `| File: \`${basename(samplePath)}\`\n` +
+          `| Size: ${formatSize(sampleStats.size)}\n\n` +
+          `(time) Total Time: ${elapsed}s`,
           { parse_mode: 'Markdown' }
         );
 
@@ -773,7 +773,7 @@ export function registerProcessCommand(
         await ctx.api.editMessageText(
           chatId,
           msgId,
-          `❌ *Process Failed*\n\n` +
+          `[ERR] *Process Failed*\n\n` +
           `Error: ${errorMsg}\n\n` +
           `Please check the links and try again.`,
           { parse_mode: 'Markdown' }

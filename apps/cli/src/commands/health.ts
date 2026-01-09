@@ -30,9 +30,9 @@ interface ComponentHealth {
 }
 
 const statusIcons: Record<string, string> = {
-  healthy: '✅',
-  degraded: '⚠️',
-  unhealthy: '❌',
+  healthy: '[OK]',
+  degraded: '[WARN]',
+  unhealthy: '[ERR]',
 };
 
 const statusColors: Record<string, (text: string) => string> = {
@@ -50,7 +50,7 @@ export async function healthCommand(): Promise<void> {
 
     const { status, timestamp, uptime, version, components } = response;
 
-    const icon = statusIcons[status] ?? '❓';
+    const icon = statusIcons[status] ?? '[?]';
     const color = statusColors[status] ?? chalk.white;
 
     printHeader(`System Health: ${icon} ${color(status.toUpperCase())}`);
@@ -93,7 +93,7 @@ export async function healthCommand(): Promise<void> {
 }
 
 function displayComponent(name: string, component: ComponentHealth): void {
-  const icon = statusIcons[component.status] ?? '❓';
+  const icon = statusIcons[component.status] ?? '[?]';
   const color = statusColors[component.status] ?? chalk.white;
   const latency = component.latency !== undefined ? `${component.latency}ms` : '';
   

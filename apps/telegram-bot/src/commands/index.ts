@@ -69,29 +69,29 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
   // /start - Welcome message
   bot.command('start', async (ctx) => {
     await ctx.reply(
-      `🤖 *Media-Bot Control Panel*\n\n` +
+      `*Media-Bot Control Panel*\n\n` +
       `Welcome! Use these commands:\n\n` +
-      `⚡ *ALL-IN-ONE*\n` +
+      `*ALL-IN-ONE*\n` +
       `/process <video> <audio> - Full pipeline\n\n` +
-      `📥 *Downloads*\n` +
+      `*Downloads*\n` +
       `/download <url> - Start download\n` +
       `/gdrive <link> - Download from GDrive\n` +
       `/jobs - List all jobs\n` +
       `/status <id> - Job status\n` +
       `/cancel <id> - Cancel job\n\n` +
-      `🎬 *Media*\n` +
+      `*Media*\n` +
       `/analyze <path> - Analyze file\n` +
       `/releases - List releases\n\n` +
-      `🔄 *Sync*\n` +
+      `*Sync*\n` +
       `/sync <video> <audio> - Sync analysis\n` +
       `/delay <ms> <in> <out> - Add delay\n` +
       `/fps <src> <tgt> <in> <out> - FPS convert\n` +
       `/tempo <factor> <in> <out> - Tempo adjust\n` +
       `/mux <video> <audio> <out> - Mux files\n\n` +
-      `📁 *Files*\n` +
+      `*Files*\n` +
       `/files - List output files\n` +
       `/dir - Show output directory\n\n` +
-      `📊 *System*\n` +
+      `*System*\n` +
       `/health - System health\n` +
       `/stats - Statistics\n` +
       `/binaries - Show binary paths\n` +
@@ -108,19 +108,19 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     // Topic-specific help
     if (topic === 'process') {
       await ctx.reply(
-        `⚡ */process* - All-in-One Pipeline\n\n` +
+        `*/process* - All-in-One Pipeline\n\n` +
         `*Usage:*\n` +
         `\`/process "video_link" "audio_link"\`\n\n` +
         `*What it does:*\n` +
-        `1️⃣ Downloads video & audio from links\n` +
-        `2️⃣ Analyzes FPS & duration\n` +
-        `3️⃣ Syncs audio (tempo + delay if needed)\n` +
-        `4️⃣ Muxes into MKV file\n` +
-        `5️⃣ Generates 30s sample\n\n` +
+        `1. Downloads video & audio from links\n` +
+        `2. Analyzes FPS & duration\n` +
+        `3. Syncs audio (tempo + delay if needed)\n` +
+        `4. Muxes into MKV file\n` +
+        `5. Generates 30s sample\n\n` +
         `*Supported Links:*\n` +
-        `• Google Drive: \`https://drive.google.com/file/d/...\`\n` +
-        `• Direct HTTP: \`https://example.com/file.mkv\`\n` +
-        `• Local path: \`C:\\Videos\\movie.mkv\`\n\n` +
+        `- Google Drive: \`https://drive.google.com/file/d/...\`\n` +
+        `- Direct HTTP: \`https://example.com/file.mkv\`\n` +
+        `- Local path: \`C:\\Videos\\movie.mkv\`\n\n` +
         `*Examples:*\n` +
         `\`/process "https://drive.google.com/file/d/abc" "https://drive.google.com/file/d/xyz"\`\n` +
         `\`/process "C:\\Video.mkv" "C:\\Audio.mka"\``,
@@ -131,13 +131,13 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
 
     if (topic === 'sync') {
       await ctx.reply(
-        `🔄 */sync* - Sync Analysis\n\n` +
+        `*/sync* - Sync Analysis\n\n` +
         `*Usage:*\n` +
         `\`/sync "video_path" "audio_path" [title]\`\n\n` +
         `Analyzes video and audio files to detect:\n` +
-        `• FPS mismatch (24 vs 25, etc.)\n` +
-        `• Duration differences\n` +
-        `• Required tempo & delay corrections\n\n` +
+        `- FPS mismatch (24 vs 25, etc.)\n` +
+        `- Duration differences\n` +
+        `- Required tempo & delay corrections\n\n` +
         `*Example:*\n` +
         `\`/sync "C:\\Movie.mkv" "C:\\Hindi.mka" "Hindi DD+ 5.1"\``,
         { parse_mode: 'Markdown' }
@@ -147,11 +147,11 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
 
     if (topic === 'delay') {
       await ctx.reply(
-        `⏱ */delay* - Add Delay to Audio\n\n` +
+        `*/delay* - Add Delay to Audio\n\n` +
         `*Usage:*\n` +
         `\`/delay <milliseconds> "input" "output"\`\n\n` +
-        `• Positive value = delay audio (starts later)\n` +
-        `• Negative value = advance audio (starts earlier)\n\n` +
+        `- Positive value = delay audio (starts later)\n` +
+        `- Negative value = advance audio (starts earlier)\n\n` +
         `*Examples:*\n` +
         `\`/delay 500 "audio.mka" "delayed.mka"\`\n` +
         `\`/delay -200 "audio.mp4" "fixed.mka"\``,
@@ -162,15 +162,15 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
 
     if (topic === 'fps') {
       await ctx.reply(
-        `🎯 */fps* - FPS Conversion\n\n` +
+        `*/fps* - FPS Conversion\n\n` +
         `*Usage:*\n` +
         `\`/fps <source_fps> <target_fps> "input" "output"\`\n\n` +
         `Converts audio from one FPS to another using tempo adjustment.\n\n` +
         `*Common Conversions:*\n` +
-        `• 24 → 23.976 (NTSC pulldown)\n` +
-        `• 25 → 23.976 (PAL to NTSC)\n` +
-        `• 25 → 24 (PAL to Film)\n` +
-        `• 23.976 → 24 (Reverse pulldown)\n\n` +
+        `- 24 -> 23.976 (NTSC pulldown)\n` +
+        `- 25 -> 23.976 (PAL to NTSC)\n` +
+        `- 25 -> 24 (PAL to Film)\n` +
+        `- 23.976 -> 24 (Reverse pulldown)\n\n` +
         `*Examples:*\n` +
         `\`/fps 25 23.976 "audio.mka" "fixed.mka"\`\n` +
         `\`/fps 24 25 "audio.mp4" "pal.mka"\``,
@@ -181,11 +181,11 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
 
     if (topic === 'tempo') {
       await ctx.reply(
-        `🎵 */tempo* - Tempo Adjustment\n\n` +
+        `*/tempo* - Tempo Adjustment\n\n` +
         `*Usage:*\n` +
         `\`/tempo <factor> "input" "output"\`\n\n` +
-        `• Factor > 1.0 = faster (shorter duration)\n` +
-        `• Factor < 1.0 = slower (longer duration)\n\n` +
+        `- Factor > 1.0 = faster (shorter duration)\n` +
+        `- Factor < 1.0 = slower (longer duration)\n\n` +
         `*Examples:*\n` +
         `\`/tempo 1.04271 "audio.mka" "synced.mka"\`\n` +
         `\`/tempo 0.999 "audio.mp4" "slower.mka"\``,
@@ -196,7 +196,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
 
     if (topic === 'trim') {
       await ctx.reply(
-        `✂️ */trim* - Trim Audio\n\n` +
+        `*/trim* - Trim Audio\n\n` +
         `*Usage:*\n` +
         `\`/trim <start> <end> "input" "output"\`\n\n` +
         `Time format: HH:MM:SS.mmm or seconds\n\n` +
@@ -210,7 +210,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
 
     if (topic === 'mux') {
       await ctx.reply(
-        `📦 */mux* - Mux Video + Audio\n\n` +
+        `*/mux* - Mux Video + Audio\n\n` +
         `*Usage:*\n` +
         `\`/mux "video" "audio" "output" [title]\`\n\n` +
         `Combines video and audio into single file.\n` +
@@ -225,14 +225,14 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
 
     if (topic === 'extract') {
       await ctx.reply(
-        `📤 */extract* - Extract Stream\n\n` +
+        `*/extract* - Extract Stream\n\n` +
         `*Usage:*\n` +
         `\`/extract "input" <stream> "output"\`\n\n` +
         `*Stream Specifiers:*\n` +
-        `• \`a:0\` - First audio track\n` +
-        `• \`a:1\` - Second audio track\n` +
-        `• \`s:0\` - First subtitle\n` +
-        `• \`v:0\` - Video stream\n\n` +
+        `- \`a:0\` - First audio track\n` +
+        `- \`a:1\` - Second audio track\n` +
+        `- \`s:0\` - First subtitle\n` +
+        `- \`v:0\` - Video stream\n\n` +
         `*Examples:*\n` +
         `\`/extract "Movie.mkv" "a:1" "Hindi.mka"\`\n` +
         `\`/extract "Movie.mkv" "s:0" "English.srt"\``,
@@ -243,13 +243,13 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
 
     if (topic === 'gdrive') {
       await ctx.reply(
-        `📥 */gdrive* - Google Drive Download\n\n` +
+        `*/gdrive* - Google Drive Download\n\n` +
         `*Usage:*\n` +
         `\`/gdrive <drive_link>\`\n\n` +
         `Downloads files from Google Drive using API.\n\n` +
         `*Supported Formats:*\n` +
-        `• \`https://drive.google.com/file/d/FILE_ID/view\`\n` +
-        `• \`https://drive.google.com/open?id=FILE_ID\`\n\n` +
+        `- \`https://drive.google.com/file/d/FILE_ID/view\`\n` +
+        `- \`https://drive.google.com/open?id=FILE_ID\`\n\n` +
         `*Example:*\n` +
         `\`/gdrive https://drive.google.com/file/d/1abc123xyz/view\``,
         { parse_mode: 'Markdown' }
@@ -259,14 +259,14 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
 
     if (topic === 'analyze') {
       await ctx.reply(
-        `🔍 */analyze* - Media Analysis\n\n` +
+        `*/analyze* - Media Analysis\n\n` +
         `*Usage:*\n` +
         `\`/analyze <file_path>\`\n\n` +
         `Shows detailed media info:\n` +
-        `• Duration, file size\n` +
-        `• Video: codec, resolution, FPS\n` +
-        `• Audio: codec, channels, language\n` +
-        `• Subtitles: languages\n\n` +
+        `- Duration, file size\n` +
+        `- Video: codec, resolution, FPS\n` +
+        `- Audio: codec, channels, language\n` +
+        `- Subtitles: languages\n\n` +
         `*Example:*\n` +
         `\`/analyze C:\\Videos\\Movie.mkv\``,
         { parse_mode: 'Markdown' }
@@ -276,46 +276,46 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
 
     // Default: show all commands overview
     await ctx.reply(
-      `📚 *Media-Bot Commands*\n\n` +
+      `*Media-Bot Commands*\n\n` +
       `Use \`/help <command>\` for detailed usage.\n\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `⚡ *ALL-IN-ONE*\n` +
+      `----------------------------\n` +
+      `*ALL-IN-ONE*\n` +
       `\`/process "video" "audio"\`\n` +
-      `  └ Full pipeline: download→sync→mux→sample\n\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `📥 *DOWNLOADS*\n` +
+      `  - Full pipeline: download->sync->mux->sample\n\n` +
+      `----------------------------\n` +
+      `*DOWNLOADS*\n` +
       `\`/download <url>\` - Magnet/HTTP download\n` +
       `\`/gdrive <link>\` - Google Drive download\n` +
       `\`/jobs [status]\` - List jobs\n` +
       `\`/status <id>\` - Job status\n` +
       `\`/cancel <id>\` - Cancel job\n` +
       `\`/retry <id>\` - Retry failed job\n\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `🔍 *ANALYSIS*\n` +
+      `----------------------------\n` +
+      `*ANALYSIS*\n` +
       `\`/analyze <path>\` - Analyze media file\n` +
       `\`/sync "video" "audio"\` - Sync analysis\n` +
       `\`/releases\` - List media assets\n\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `🔄 *AUDIO SYNC*\n` +
+      `----------------------------\n` +
+      `*AUDIO SYNC*\n` +
       `\`/delay <ms> "in" "out"\` - Add delay\n` +
       `\`/fps <src> <tgt> "in" "out"\` - FPS convert\n` +
       `\`/tempo <factor> "in" "out"\` - Speed adjust\n` +
       `\`/trim <start> <end> "in" "out"\` - Trim\n\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `📦 *MUXING*\n` +
+      `----------------------------\n` +
+      `*MUXING*\n` +
       `\`/mux "video" "audio" "out" [title]\`\n` +
       `\`/extract "input" <stream> "out"\`\n\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `📁 *FILES*\n` +
+      `----------------------------\n` +
+      `*FILES*\n` +
       `\`/files\` - List output files\n` +
       `\`/dir\` - Show output directory\n\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `⚙️ *SYSTEM*\n` +
+      `----------------------------\n` +
+      `*SYSTEM*\n` +
       `\`/health\` - System health\n` +
       `\`/stats\` - Statistics\n` +
       `\`/binaries\` - Binary paths\n` +
       `\`/config\` - Configuration\n\n` +
-      `📁 Output: \`${config.storage.working}\``,
+      `Output: \`${config.storage.working}\``,
       { parse_mode: 'Markdown' }
     );
   });
@@ -324,18 +324,18 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
   bot.command('health', async (ctx) => {
     try {
       const dbCheck = await prisma.$queryRaw`SELECT 1 as ok`;
-      const dbStatus = dbCheck ? '✅' : '❌';
+      const dbStatus = dbCheck ? '[OK]' : '[ERR]';
       
       await ctx.reply(
-        `🏥 *System Health*\n\n` +
+        `*System Health*\n\n` +
         `Database: ${dbStatus} Connected\n` +
-        `Bot: ✅ Running\n` +
+        `Bot: [OK] Running\n` +
         `Time: ${new Date().toISOString()}`,
         { parse_mode: 'Markdown' }
       );
     } catch (err) {
       logger.error({ err }, 'Health check failed');
-      await ctx.reply('❌ Health check failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      await ctx.reply('[ERR] Health check failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   });
 
@@ -351,19 +351,19 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       ]);
 
       await ctx.reply(
-        `📊 *Statistics*\n\n` +
+        `*Statistics*\n\n` +
         `*Jobs:*\n` +
-        `├ Total: ${totalJobs}\n` +
-        `├ Active: ${activeJobs}\n` +
-        `├ Completed: ${completedJobs}\n` +
-        `└ Failed: ${failedJobs}\n\n` +
+        `| Total: ${totalJobs}\n` +
+        `| Active: ${activeJobs}\n` +
+        `| Completed: ${completedJobs}\n` +
+        `| Failed: ${failedJobs}\n\n` +
         `*Media:*\n` +
-        `└ Assets: ${totalAssets}`,
+        `| Assets: ${totalAssets}`,
         { parse_mode: 'Markdown' }
       );
     } catch (err) {
       logger.error({ err }, 'Stats fetch failed');
-      await ctx.reply('❌ Failed to fetch stats');
+      await ctx.reply('[ERR] Failed to fetch stats');
     }
   });
 
@@ -381,38 +381,38 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       });
 
       if (jobs.length === 0) {
-        await ctx.reply('📭 No jobs found.');
+        await ctx.reply('No jobs found.');
         return;
       }
 
       const statusEmoji: Record<string, string> = {
-        'PENDING': '⏳',
-        'DOWNLOADING': '📥',
-        'ANALYZING': '🔍',
-        'SYNCING': '🔄',
-        'PROCESSING': '⚙️',
-        'VALIDATING': '✔️',
-        'PACKAGED': '📦',
-        'UPLOADED': '☁️',
-        'DONE': '✅',
-        'FAILED': '❌',
-        'CANCELLED': '🚫',
+        'PENDING': '[WAIT]',
+        'DOWNLOADING': '[DL]',
+        'ANALYZING': '[SCAN]',
+        'SYNCING': '[SYNC]',
+        'PROCESSING': '[PROC]',
+        'VALIDATING': '[CHK]',
+        'PACKAGED': '[PKG]',
+        'UPLOADED': '[UP]',
+        'DONE': '[OK]',
+        'FAILED': '[ERR]',
+        'CANCELLED': '[X]',
       };
 
       const jobList = jobs.map(job => {
-        const emoji = statusEmoji[job.state] ?? '❓';
+        const emoji = statusEmoji[job.state] ?? '[?]';
         const shortId = job.id.slice(0, 8);
         return `${emoji} \`${shortId}\` ${job.type} - ${job.state}`;
       }).join('\n');
 
       await ctx.reply(
-        `📋 *Recent Jobs*\n\n${jobList}\n\n` +
+        `*Recent Jobs*\n\n${jobList}\n\n` +
         `Use \`/status <id>\` for details`,
         { parse_mode: 'Markdown' }
       );
     } catch (err) {
       logger.error({ err }, 'Jobs list failed');
-      await ctx.reply('❌ Failed to fetch jobs');
+      await ctx.reply('[ERR] Failed to fetch jobs');
     }
   });
 
@@ -437,21 +437,21 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       });
 
       if (!job) {
-        await ctx.reply('❌ Job not found');
+        await ctx.reply('[ERR] Job not found');
         return;
       }
 
       const statusEmoji: Record<string, string> = {
-        'PENDING': '⏳',
-        'DOWNLOADING': '📥',
-        'ANALYZING': '🔍',
-        'PROCESSING': '⚙️',
-        'DONE': '✅',
-        'FAILED': '❌',
-        'CANCELLED': '🚫',
+        'PENDING': '[WAIT]',
+        'DOWNLOADING': '[DL]',
+        'ANALYZING': '[SCAN]',
+        'PROCESSING': '[PROC]',
+        'DONE': '[OK]',
+        'FAILED': '[ERR]',
+        'CANCELLED': '[X]',
       };
 
-      const emoji = statusEmoji[job.state] ?? '❓';
+      const emoji = statusEmoji[job.state] ?? '[?]';
       const progress = job.progress ? `${job.progress}%` : 'N/A';
 
       await ctx.reply(
@@ -466,7 +466,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       );
     } catch (err) {
       logger.error({ err }, 'Status fetch failed');
-      await ctx.reply('❌ Failed to fetch job status');
+      await ctx.reply('[ERR] Failed to fetch job status');
     }
   });
 
@@ -511,7 +511,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       });
 
       await ctx.reply(
-        `📥 *Download Job Created*\n\n` +
+        `*Download Job Created*\n\n` +
         `*ID:* \`${job.id.slice(0, 8)}\`\n` +
         `*Type:* DOWNLOAD\n` +
         `*State:* PENDING\n\n` +
@@ -522,7 +522,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       logger.info({ jobId: job.id, url }, 'Download job created via Telegram');
     } catch (err) {
       logger.error({ err }, 'Download creation failed');
-      await ctx.reply('❌ Failed to create download job');
+      await ctx.reply('[ERR] Failed to create download job');
     }
   });
 
@@ -547,12 +547,12 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       });
 
       if (!job) {
-        await ctx.reply('❌ Job not found');
+        await ctx.reply('[ERR] Job not found');
         return;
       }
 
       if (['DONE', 'FAILED', 'CANCELLED'].includes(job.state)) {
-        await ctx.reply(`⚠️ Job is already ${job.state}`);
+        await ctx.reply(`[WARN] Job is already ${job.state}`);
         return;
       }
 
@@ -561,11 +561,11 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         data: { state: 'CANCELLED' },
       });
 
-      await ctx.reply(`🚫 Job \`${job.id.slice(0, 8)}\` cancelled`, { parse_mode: 'Markdown' });
+      await ctx.reply(`[X] Job \`${job.id.slice(0, 8)}\` cancelled`, { parse_mode: 'Markdown' });
       logger.info({ jobId: job.id }, 'Job cancelled via Telegram');
     } catch (err) {
       logger.error({ err }, 'Job cancellation failed');
-      await ctx.reply('❌ Failed to cancel job');
+      await ctx.reply('[ERR] Failed to cancel job');
     }
   });
 
@@ -590,12 +590,12 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       });
 
       if (!job) {
-        await ctx.reply('❌ Job not found');
+        await ctx.reply('[ERR] Job not found');
         return;
       }
 
       if (job.state !== 'FAILED') {
-        await ctx.reply(`⚠️ Only failed jobs can be retried. Current state: ${job.state}`);
+        await ctx.reply(`[WARN] Only failed jobs can be retried. Current state: ${job.state}`);
         return;
       }
 
@@ -609,7 +609,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       });
 
       await ctx.reply(
-        `🔄 *Job Queued for Retry*\n\n` +
+        `*Job Queued for Retry*\n\n` +
         `*ID:* \`${job.id.slice(0, 8)}\`\n` +
         `*Type:* ${job.type}\n` +
         `*State:* PENDING\n\n` +
@@ -619,7 +619,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       logger.info({ jobId: job.id }, 'Job retry queued via Telegram');
     } catch (err) {
       logger.error({ err }, 'Job retry failed');
-      await ctx.reply('❌ Failed to retry job');
+      await ctx.reply('[ERR] Failed to retry job');
     }
   });
 
@@ -631,7 +631,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
 
     if (!link) {
       await ctx.reply(
-        `📥 *Google Drive Download*\n\n` +
+        `*Google Drive Download*\n\n` +
         `Usage: \`/gdrive <drive_link>\`\n\n` +
         `Example:\n` +
         `\`/gdrive https://drive.google.com/file/d/abc123/view\``,
@@ -641,11 +641,11 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     }
 
     if (!config.gdrive.apiKey) {
-      await ctx.reply('❌ Google Drive API key not configured');
+      await ctx.reply('[ERR] Google Drive API key not configured');
       return;
     }
 
-    const progressMsg = await ctx.reply('📥 Fetching file info...');
+    const progressMsg = await ctx.reply('Fetching file info...');
     const chatId = ctx.chat!.id;
     const msgId = progressMsg.message_id;
 
@@ -660,7 +660,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
 
         const fileId = GDriveApiClient.extractFileId(link);
         if (!fileId) {
-          await ctx.api.editMessageText(chatId, msgId, '❌ Invalid Google Drive link');
+          await ctx.api.editMessageText(chatId, msgId, '[ERR] Invalid Google Drive link');
           return;
         }
 
@@ -670,10 +670,10 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
 
         await ctx.api.editMessageText(
           chatId, msgId,
-          `📥 *Downloading from Google Drive*\n\n` +
+          `*Downloading from Google Drive*\n\n` +
           `File: \`${metadata.name}\`\n` +
           `Size: ${sizeStr}\n\n` +
-          `⏳ Starting download...`,
+          `Starting download...`,
           { parse_mode: 'Markdown' }
         );
 
@@ -688,7 +688,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
             try {
               await ctx.api.editMessageText(
                 chatId, msgId,
-                `📥 *Downloading*\n\n` +
+                `*Downloading*\n\n` +
                 `File: \`${metadata.name}\`\n` +
                 `Progress: ${progress.percentage}%\n` +
                 `Speed: ${speedMBps} MB/s\n` +
@@ -704,7 +704,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         if (result.success) {
           await ctx.api.editMessageText(
             chatId, msgId,
-            `✅ *Download Complete*\n\n` +
+            `[OK] *Download Complete*\n\n` +
             `File: \`${result.fileName}\`\n` +
             `Path: \`${result.filePath}\`\n` +
             `Time: ${result.duration.toFixed(1)}s`,
@@ -712,11 +712,11 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
           );
           logger.info({ fileId, fileName: result.fileName }, 'GDrive download completed');
         } else {
-          await ctx.api.editMessageText(chatId, msgId, `❌ Download failed: ${result.error}`);
+          await ctx.api.editMessageText(chatId, msgId, `[ERR] Download failed: ${result.error}`);
         }
       } catch (err) {
         logger.error({ err }, 'GDrive download failed');
-        await ctx.api.editMessageText(chatId, msgId, '❌ Download failed: ' + (err instanceof Error ? err.message : 'Unknown'));
+        await ctx.api.editMessageText(chatId, msgId, '[ERR] Download failed: ' + (err instanceof Error ? err.message : 'Unknown'));
       }
     });
   });
@@ -729,11 +729,11 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       const folders = getBinaryFolders();
 
       const binaryList = Object.entries(config).map(([name, info]: [string, any]) => {
-        return `• \`${name}\`: ${info.isAvailable ? '✅' : '❌'} \`${info.resolvedPath}\``;
+        return `- \`${name}\`: ${info.isAvailable ? '[OK]' : '[ERR]'} \`${info.resolvedPath}\``;
       }).join('\n');
 
       await ctx.reply(
-        `🔧 *Binary Configuration*\n\n` +
+        `*Binary Configuration*\n\n` +
         `*Folder:* \`${folders.os}\`\n\n` +
         `*Binaries:*\n${binaryList}\n\n` +
         `Set paths via environment variables or place binaries in the folder above.`,
@@ -741,21 +741,21 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       );
     } catch (err) {
       logger.error({ err }, 'Failed to get binaries config');
-      await ctx.reply('❌ Failed to get binary configuration');
+      await ctx.reply('[ERR] Failed to get binary configuration');
     }
   });
 
   // /config - Show current configuration
   bot.command('config', async (ctx) => {
     await ctx.reply(
-      `⚙️ *Bot Configuration*\n\n` +
+      `*Bot Configuration*\n\n` +
       `*Storage:*\n` +
-      `├ Working: \`${config.storage.working}\`\n` +
-      `├ Processed: \`${config.storage.processed}\`\n` +
-      `└ Samples: \`${config.storage.samples}\`\n\n` +
+      `| Working: \`${config.storage.working}\`\n` +
+      `| Processed: \`${config.storage.processed}\`\n` +
+      `| Samples: \`${config.storage.samples}\`\n\n` +
       `*APIs:*\n` +
-      `├ GDrive: ${config.gdrive.apiKey ? '✅ Configured' : '❌ Not set'}\n` +
-      `└ API URL: \`${config.apiUrl}\`\n\n` +
+      `| GDrive: ${config.gdrive.apiKey ? '[OK] Configured' : '[ERR] Not set'}\n` +
+      `| API URL: \`${config.apiUrl}\`\n\n` +
       `*Environment:* ${config.nodeEnv}\n` +
       `*Log Level:* ${config.logLevel}`,
       { parse_mode: 'Markdown' }
@@ -773,11 +773,11 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     }
 
     if (!existsSync(filePath)) {
-      await ctx.reply('❌ File not found: ' + filePath);
+      await ctx.reply('[ERR] File not found: ' + filePath);
       return;
     }
 
-    const progressMsg = await ctx.reply('🔍 Analyzing file...');
+    const progressMsg = await ctx.reply('Analyzing file...');
 
     try {
       const analyzer = new MediaAnalyzer();
@@ -817,7 +817,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       await ctx.api.editMessageText(
         ctx.chat!.id,
         progressMsg.message_id,
-        `🎬 *Media Analysis*\n\n` +
+        `*Media Analysis*\n\n` +
         `*File:* \`${meta.fileName}\`\n` +
         `*Size:* ${sizeStr}\n` +
         `*Duration:* ${durationStr}\n` +
@@ -825,7 +825,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         `*Video:* ${videoInfo}\n` +
         `*Audio:* ${audioInfo}\n` +
         `*Subtitles:* ${subInfo}\n` +
-        (result.warnings.length > 0 ? `\n⚠️ Warnings: ${result.warnings.join(', ')}` : ''),
+        (result.warnings.length > 0 ? `\n[WARN] Warnings: ${result.warnings.join(', ')}` : ''),
         { parse_mode: 'Markdown' }
       );
 
@@ -835,7 +835,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       await ctx.api.editMessageText(
         ctx.chat!.id,
         progressMsg.message_id,
-        '❌ Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error')
+        '[ERR] Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error')
       );
     }
   });
@@ -849,23 +849,23 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       });
 
       if (assets.length === 0) {
-        await ctx.reply('📭 No media assets found.');
+        await ctx.reply('No media assets found.');
         return;
       }
 
       const assetList = assets.map(a => {
         const shortId = a.id.slice(0, 8);
         const size = a.fileSize ? `${(Number(a.fileSize) / 1024 / 1024 / 1024).toFixed(2)} GB` : 'N/A';
-        return `📀 \`${shortId}\` ${a.fileName} (${size})`;
+        return `[ASSET] \`${shortId}\` ${a.fileName} (${size})`;
       }).join('\n');
 
       await ctx.reply(
-        `📀 *Recent Media Assets*\n\n${assetList}`,
+        `*Recent Media Assets*\n\n${assetList}`,
         { parse_mode: 'Markdown' }
       );
     } catch (err) {
       logger.error({ err }, 'Assets list failed');
-      await ctx.reply('❌ Failed to fetch media assets');
+      await ctx.reply('[ERR] Failed to fetch media assets');
     }
   });
 
@@ -880,7 +880,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     
     if (args.length < 2) {
       await ctx.reply(
-        `🔄 *Sync Analysis*\n\n` +
+        `*Sync Analysis*\n\n` +
         `Usage: \`/sync <video> <audio> [title]\`\n\n` +
         `Example:\n` +
         `\`/sync "Movie.mkv" "Hindi.mp4" "HS DDP 5.1"\``,
@@ -892,15 +892,15 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     const [videoPath, audioPath, title] = args;
     
     if (!existsSync(videoPath)) {
-      await ctx.reply('❌ Video file not found: ' + videoPath);
+      await ctx.reply('[ERR] Video file not found: ' + videoPath);
       return;
     }
     if (!existsSync(audioPath)) {
-      await ctx.reply('❌ Audio file not found: ' + audioPath);
+      await ctx.reply('[ERR] Audio file not found: ' + audioPath);
       return;
     }
 
-    const progressMsg = await ctx.reply('🔍 Analyzing files for sync...');
+    const progressMsg = await ctx.reply('Analyzing files for sync...');
 
     try {
       const analyzer = new MediaAnalyzer();
@@ -916,11 +916,11 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       const audioStream = audioMeta.audioStreams[0];
       
       if (!videoStream) {
-        await ctx.api.editMessageText(ctx.chat!.id, progressMsg.message_id, '❌ No video stream found');
+        await ctx.api.editMessageText(ctx.chat!.id, progressMsg.message_id, '[ERR] No video stream found');
         return;
       }
       if (!audioStream) {
-        await ctx.api.editMessageText(ctx.chat!.id, progressMsg.message_id, '❌ No audio stream found');
+        await ctx.api.editMessageText(ctx.chat!.id, progressMsg.message_id, '[ERR] No audio stream found');
         return;
       }
 
@@ -975,26 +975,26 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       };
 
       // Build report
-      let report = `🎞 *MEDIA SYNC REPORT*\n`;
-      report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-      report += `🎬 \`${videoMeta.fileName}\` (${formatSize(videoMeta.fileSize)})\n`;
-      report += `   └─ Stream: ${videoFps.toFixed(3)} \\[${formatDur(videoDuration)}\\]\n\n`;
-      report += `🎧 \`${audioMeta.fileName}\` (${formatSize(audioMeta.fileSize)})\n`;
-      report += `   └─ Stream: ${detectedAudioFps} \\[${formatDur(audioDuration)}\\]\n`;
-      if (title) report += `   └─ Title: ${title}\n`;
-      report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+      let report = `*MEDIA SYNC REPORT*\n`;
+      report += `----------------------------\n`;
+      report += `[VIDEO] \`${videoMeta.fileName}\` (${formatSize(videoMeta.fileSize)})\n`;
+      report += `   - Stream: ${videoFps.toFixed(3)} \\[${formatDur(videoDuration)}\\]\n\n`;
+      report += `[AUDIO] \`${audioMeta.fileName}\` (${formatSize(audioMeta.fileSize)})\n`;
+      report += `   - Stream: ${detectedAudioFps} \\[${formatDur(audioDuration)}\\]\n`;
+      if (title) report += `   - Title: ${title}\n`;
+      report += `----------------------------\n\n`;
 
-      report += `📊 *RAW DATA CHECK*\n\n`;
+      report += `*RAW DATA CHECK*\n\n`;
       report += `\`Stream        FPS     Duration\`\n`;
-      report += `\`────────────  ──────  ──────────────\`\n`;
+      report += `\`------------  ------  --------------\`\n`;
       report += `\`Video       : ${videoFps.toFixed(3).padEnd(6)} ${formatDur(videoDuration)}\`\n`;
       report += `\`Audio (Raw) : ${detectedAudioFps.toString().padEnd(6)} ${formatDur(audioDuration)}\`\n`;
       report += `\`Raw Diff    :         ${formatDur(Math.abs(rawDiff))}\`\n\n`;
 
       if (fpsConversionNeeded) {
-        report += `📉 *PROJECTED SYNC CHECK*\n\n`;
+        report += `*PROJECTED SYNC CHECK*\n\n`;
         report += `\`Stream        FPS     Duration\`\n`;
-        report += `\`────────────  ──────  ──────────────\`\n`;
+        report += `\`------------  ------  --------------\`\n`;
         report += `\`Video Data  : ${videoFps.toFixed(3).padEnd(6)} ${formatDur(videoDuration)}\`\n`;
         report += `\`Audio Data  : ${videoFps.toFixed(3).padEnd(6)} ${formatDur(projectedDuration)}\`\n`;
         report += `\`Difference  :         ${formatDur(Math.abs(projectedDiff))}\`\n\n`;
@@ -1003,24 +1003,24 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       // Actions needed
       const actions: string[] = [];
       if (fpsConversionNeeded) {
-        actions.push(`1️⃣ Convert Audio: ${detectedAudioFps} ➔ ${videoFps.toFixed(3)}`);
+        actions.push(`1. Convert Audio: ${detectedAudioFps} -> ${videoFps.toFixed(3)}`);
         actions.push(`   \`/fps ${detectedAudioFps} ${videoFps.toFixed(3)} "${audioPath}" "output.mka"\``);
       }
       if (Math.abs(delayMs) > 10) {
-        actions.push(`${actions.length + 1}️⃣ Add Delay: ${delayMs} ms`);
+        actions.push(`${actions.length + 1}. Add Delay: ${delayMs} ms`);
         actions.push(`   \`/delay ${delayMs} "input.mka" "output.mka"\``);
       }
       if (actions.length > 0) {
-        report += `⚠️ *ACTION REQUIRED*\n`;
+        report += `[WARN] *ACTION REQUIRED*\n`;
         report += actions.join('\n') + '\n';
       } else {
-        report += `✅ *Audio is in sync!*\n`;
+        report += `[OK] *Audio is in sync!*\n`;
       }
-      report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+      report += `----------------------------\n`;
 
       // Quick command summary
       if (fpsConversionNeeded || Math.abs(delayMs) > 10) {
-        report += `\n💡 *Quick Command:*\n`;
+        report += `\n*Quick Command:*\n`;
         if (fpsConversionNeeded && Math.abs(delayMs) > 10) {
           report += `\`/process "${audioPath}" "${videoPath}" ${delayMs}\``;
         } else if (fpsConversionNeeded) {
@@ -1034,7 +1034,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       logger.info({ videoPath, audioPath }, 'Sync analysis completed');
     } catch (err) {
       logger.error({ err }, 'Sync analysis failed');
-      await ctx.api.editMessageText(ctx.chat!.id, progressMsg.message_id, '❌ Sync analysis failed: ' + (err instanceof Error ? err.message : 'Unknown'));
+      await ctx.api.editMessageText(ctx.chat!.id, progressMsg.message_id, '[ERR] Sync analysis failed: ' + (err instanceof Error ? err.message : 'Unknown'));
     }
   });
 
@@ -1045,7 +1045,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     
     if (args.length < 3) {
       await ctx.reply(
-        `⏱ *Add Delay*\n\n` +
+        `*Add Delay*\n\n` +
         `Usage: \`/delay <ms> <input> <output>\`\n\n` +
         `Examples:\n` +
         `\`/delay 42 "audio.mka" "delayed.mka"\`\n` +
@@ -1062,15 +1062,15 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     const outputPath = getOutputPath(args[2]);
 
     if (isNaN(delayMs)) {
-      await ctx.reply('❌ Invalid delay value. Must be a number in milliseconds.');
+      await ctx.reply('[ERR] Invalid delay value. Must be a number in milliseconds.');
       return;
     }
     if (!existsSync(inputPath)) {
-      await ctx.reply('❌ Input file not found: ' + inputPath);
+      await ctx.reply('[ERR] Input file not found: ' + inputPath);
       return;
     }
 
-    const progressMsg = await ctx.reply(`⏱ Applying ${delayMs}ms delay...\n\n⏳ This may take several minutes for long files. Bot remains responsive.`);
+    const progressMsg = await ctx.reply(`Applying ${delayMs}ms delay... This may take several minutes for long files. Bot remains responsive.`);
     const chatId = ctx.chat!.id;
     const msgId = progressMsg.message_id;
 
@@ -1098,7 +1098,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         await ctx.api.editMessageText(
           chatId,
           msgId,
-          `✅ *Delay Applied*\n\n` +
+          `[OK] *Delay Applied*\n\n` +
           `Input: \`${basename(inputPath)}\`\n` +
           `Output: \`${outputPath}\`\n` +
           `Delay: ${delayMs}ms\n` +
@@ -1108,7 +1108,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         logger.info({ inputPath, outputPath, delayMs, elapsed }, 'Delay applied');
       } catch (err) {
         logger.error({ err }, 'Delay failed');
-        await ctx.api.editMessageText(chatId, msgId, '❌ Failed: ' + (err instanceof Error ? err.message : 'Unknown'));
+        await ctx.api.editMessageText(chatId, msgId, '[ERR] Failed: ' + (err instanceof Error ? err.message : 'Unknown'));
       }
     });
   });
@@ -1120,15 +1120,15 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     
     if (args.length < 4) {
       await ctx.reply(
-        `🎯 *FPS Conversion*\n\n` +
+        `*FPS Conversion*\n\n` +
         `Usage: \`/fps <source> <target> <input> <output>\`\n\n` +
         `Examples:\n` +
         `\`/fps 24 23.976 "audio.mp4" "fixed.mka"\`\n` +
         `\`/fps 25 23.976 "audio.mka" "synced.mka"\`\n\n` +
         `Common conversions:\n` +
-        `• 24 ➔ 23.976 (NTSC pulldown)\n` +
-        `• 25 ➔ 23.976 (PAL to NTSC)\n` +
-        `• 23.976 ➔ 24 (Reverse pulldown)`,
+        `- 24 -> 23.976 (NTSC pulldown)\n` +
+        `- 25 -> 23.976 (PAL to NTSC)\n` +
+        `- 23.976 -> 24 (Reverse pulldown)`,
         { parse_mode: 'Markdown' }
       );
       return;
@@ -1140,16 +1140,16 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     const outputPath = getOutputPath(args[3]);
 
     if (isNaN(sourceFps) || isNaN(targetFps)) {
-      await ctx.reply('❌ Invalid FPS values. Must be numbers.');
+      await ctx.reply('[ERR] Invalid FPS values. Must be numbers.');
       return;
     }
     if (!existsSync(inputPath)) {
-      await ctx.reply('❌ Input file not found: ' + inputPath);
+      await ctx.reply('[ERR] Input file not found: ' + inputPath);
       return;
     }
 
     const tempoFactor = sourceFps / targetFps;
-    const progressMsg = await ctx.reply(`🎯 Converting FPS ${sourceFps} ➔ ${targetFps}...\n\n⏳ This may take several minutes. Bot remains responsive.`);
+    const progressMsg = await ctx.reply(`Converting FPS ${sourceFps} -> ${targetFps}...\n\nThis may take several minutes. Bot remains responsive.`);
     const chatId = ctx.chat!.id;
     const msgId = progressMsg.message_id;
 
@@ -1181,10 +1181,10 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         await ctx.api.editMessageText(
           chatId,
           msgId,
-          `✅ *FPS Conversion Complete*\n\n` +
+          `[OK] *FPS Conversion Complete*\n\n` +
           `Input: \`${basename(inputPath)}\`\n` +
           `Output: \`${outputPath}\`\n` +
-          `FPS: ${sourceFps} ➔ ${targetFps}\n` +
+          `FPS: ${sourceFps} -> ${targetFps}\n` +
           `Tempo: ${tempoFactor.toFixed(6)}\n` +
           `Time: ${elapsed}s`,
           { parse_mode: 'Markdown' }
@@ -1192,7 +1192,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         logger.info({ inputPath, outputPath, sourceFps, targetFps, tempoFactor, elapsed }, 'FPS conversion completed');
       } catch (err) {
         logger.error({ err }, 'FPS conversion failed');
-        await ctx.api.editMessageText(chatId, msgId, '❌ Failed: ' + (err instanceof Error ? err.message : 'Unknown'));
+        await ctx.api.editMessageText(chatId, msgId, '[ERR] Failed: ' + (err instanceof Error ? err.message : 'Unknown'));
       }
     });
   });
@@ -1204,7 +1204,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     
     if (args.length < 3) {
       await ctx.reply(
-        `🎵 *Tempo Adjustment*\n\n` +
+        `*Tempo Adjustment*\n\n` +
         `Usage: \`/tempo <factor> <input> <output>\`\n\n` +
         `Examples:\n` +
         `\`/tempo 1.001 "audio.mka" "adjusted.mka"\`\n` +
@@ -1221,15 +1221,15 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     const outputPath = getOutputPath(args[2]);
 
     if (isNaN(tempoFactor) || tempoFactor <= 0) {
-      await ctx.reply('❌ Invalid tempo factor. Must be a positive number.');
+      await ctx.reply('[ERR] Invalid tempo factor. Must be a positive number.');
       return;
     }
     if (!existsSync(inputPath)) {
-      await ctx.reply('❌ Input file not found: ' + inputPath);
+      await ctx.reply('[ERR] Input file not found: ' + inputPath);
       return;
     }
 
-    const progressMsg = await ctx.reply(`🎵 Applying tempo ${tempoFactor}...\n\n⏳ This may take several minutes. Bot remains responsive.`);
+    const progressMsg = await ctx.reply(`Applying tempo ${tempoFactor}...\n\nThis may take several minutes. Bot remains responsive.`);
     const chatId = ctx.chat!.id;
     const msgId = progressMsg.message_id;
 
@@ -1260,7 +1260,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         await ctx.api.editMessageText(
           chatId,
           msgId,
-          `✅ *Tempo Applied*\n\n` +
+          `[OK] *Tempo Applied*\n\n` +
           `Input: \`${basename(inputPath)}\`\n` +
           `Output: \`${outputPath}\`\n` +
           `Tempo: ${tempoFactor}\n` +
@@ -1270,7 +1270,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         logger.info({ inputPath, outputPath, tempoFactor, elapsed }, 'Tempo applied');
       } catch (err) {
         logger.error({ err }, 'Tempo failed');
-        await ctx.api.editMessageText(chatId, msgId, '❌ Failed: ' + (err instanceof Error ? err.message : 'Unknown'));
+        await ctx.api.editMessageText(chatId, msgId, '[ERR] Failed: ' + (err instanceof Error ? err.message : 'Unknown'));
       }
     });
   });
@@ -1282,7 +1282,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     
     if (args.length < 4) {
       await ctx.reply(
-        `✂️ *Trim Audio*\n\n` +
+        `*Trim Audio*\n\n` +
         `Usage: \`/trim <start> <end> <input> <output>\`\n\n` +
         `Time format: HH:MM:SS.mmm or seconds\n\n` +
         `Examples:\n` +
@@ -1299,11 +1299,11 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     const outputPath = getOutputPath(args[3]);
 
     if (!existsSync(inputPath)) {
-      await ctx.reply('❌ Input file not found: ' + inputPath);
+      await ctx.reply('[ERR] Input file not found: ' + inputPath);
       return;
     }
 
-    const progressMsg = await ctx.reply(`✂️ Trimming from ${startTime} to ${endTime}...\n\n⏳ Bot remains responsive.`);
+    const progressMsg = await ctx.reply(`Trimming from ${startTime} to ${endTime}...\n\nBot remains responsive.`);
     const chatId = ctx.chat!.id;
     const msgId = progressMsg.message_id;
 
@@ -1318,17 +1318,17 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         await ctx.api.editMessageText(
           chatId,
           msgId,
-          `✅ *Trim Complete*\n\n` +
+          `[OK] *Trim Complete*\n\n` +
           `Input: \`${basename(inputPath)}\`\n` +
           `Output: \`${outputPath}\`\n` +
-          `Range: ${startTime} ➔ ${endTime}\n` +
+          `Range: ${startTime} -> ${endTime}\n` +
           `Time: ${elapsed}s`,
           { parse_mode: 'Markdown' }
         );
         logger.info({ inputPath, outputPath, startTime, endTime, elapsed }, 'Trim completed');
       } catch (err) {
         logger.error({ err }, 'Trim failed');
-        await ctx.api.editMessageText(chatId, msgId, '❌ Failed: ' + (err instanceof Error ? err.message : 'Unknown'));
+        await ctx.api.editMessageText(chatId, msgId, '[ERR] Failed: ' + (err instanceof Error ? err.message : 'Unknown'));
       }
     });
   });
@@ -1340,7 +1340,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     
     if (args.length < 3) {
       await ctx.reply(
-        `📦 *Mux Video + Audio*\n\n` +
+        `*Mux Video + Audio*\n\n` +
         `Usage: \`/mux <video> <audio> <output> [title]\`\n\n` +
         `Examples:\n` +
         `\`/mux "Movie.mkv" "Hindi.mka" "Movie.Hindi.mkv"\`\n` +
@@ -1356,15 +1356,15 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     const title = args[3] || '';
 
     if (!existsSync(videoPath)) {
-      await ctx.reply('❌ Video file not found: ' + videoPath);
+      await ctx.reply('[ERR] Video file not found: ' + videoPath);
       return;
     }
     if (!existsSync(audioPath)) {
-      await ctx.reply('❌ Audio file not found: ' + audioPath);
+      await ctx.reply('[ERR] Audio file not found: ' + audioPath);
       return;
     }
 
-    const progressMsg = await ctx.reply(`📦 Muxing files...\n\n⏳ This may take a while. Bot remains responsive.`);
+    const progressMsg = await ctx.reply(`Muxing files...\n\nThis may take a while. Bot remains responsive.`);
     const chatId = ctx.chat!.id;
     const msgId = progressMsg.message_id;
 
@@ -1392,7 +1392,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         await ctx.api.editMessageText(
           chatId,
           msgId,
-          `✅ *Mux Complete*\n\n` +
+          `[OK] *Mux Complete*\n\n` +
           `Video: \`${basename(videoPath)}\`\n` +
           `Audio: \`${basename(audioPath)}\`\n` +
           `Output: \`${outputPath}\`\n` +
@@ -1403,7 +1403,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         logger.info({ videoPath, audioPath, outputPath, title, elapsed }, 'Mux completed');
       } catch (err) {
         logger.error({ err }, 'Mux failed');
-        await ctx.api.editMessageText(chatId, msgId, '❌ Failed: ' + (err instanceof Error ? err.message : 'Unknown'));
+        await ctx.api.editMessageText(chatId, msgId, '[ERR] Failed: ' + (err instanceof Error ? err.message : 'Unknown'));
       }
     });
   });
@@ -1415,16 +1415,16 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     
     if (args.length < 3) {
       await ctx.reply(
-        `📤 *Extract Stream*\n\n` +
+        `*Extract Stream*\n\n` +
         `Usage: \`/extract <input> <stream> <output>\`\n\n` +
         `Stream specifiers:\n` +
-        `• \`a:0\` - First audio\n` +
-        `• \`a:1\` - Second audio\n` +
-        `• \`s:0\` - First subtitle\n` +
-        `• \`v:0\` - Video stream\n\n` +
+        `- \`a:0\` - First audio\n` +
+        `- \`a:1\` - Second audio\n` +
+        `- \`s:0\` - First subtitle\n` +
+        `- \`v:0\` - Video stream\n\n` +
         `Example:\n` +
         `\`/extract "Movie.mkv" "a:1" "Hindi.mka"\`\n\n` +
-        `📁 Output: \`${config.storage.working}\``,
+        `Output: \`${config.storage.working}\``,
         { parse_mode: 'Markdown' }
       );
       return;
@@ -1435,11 +1435,11 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     const outputPath = getOutputPath(args[2]);
 
     if (!existsSync(inputPath)) {
-      await ctx.reply('❌ Input file not found: ' + inputPath);
+      await ctx.reply('[ERR] Input file not found: ' + inputPath);
       return;
     }
 
-    const progressMsg = await ctx.reply(`📤 Extracting stream ${streamSpec}...\n\n⏳ This may take a while for large files. Bot remains responsive.`);
+    const progressMsg = await ctx.reply(`Extracting stream ${streamSpec}...\n\nThis may take a while for large files. Bot remains responsive.`);
     const chatId = ctx.chat!.id;
     const msgId = progressMsg.message_id;
 
@@ -1454,18 +1454,18 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         await ctx.api.editMessageText(
           chatId,
           msgId,
-          `✅ *Extraction Complete*\n\n` +
+          `[OK] *Extraction Complete*\n\n` +
           `Input: \`${basename(inputPath)}\`\n` +
           `Output: \`${outputPath}\`\n` +
           `Stream: ${streamSpec}\n` +
           `Time: ${elapsed}s\n\n` +
-          `📁 Use /files to list outputs`,
+          `Use /files to list outputs`,
           { parse_mode: 'Markdown' }
         );
         logger.info({ inputPath, streamSpec, outputPath, elapsed }, 'Extraction completed');
       } catch (err) {
         logger.error({ err }, 'Extraction failed');
-        await ctx.api.editMessageText(chatId, msgId, '❌ Failed: ' + (err instanceof Error ? err.message : 'Unknown'));
+        await ctx.api.editMessageText(chatId, msgId, '[ERR] Failed: ' + (err instanceof Error ? err.message : 'Unknown'));
       }
     });
   });
@@ -1477,7 +1477,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     
     if (args.length < 3) {
       await ctx.reply(
-        `⚙️ *Full Sync Process*\n\n` +
+        `*Full Sync Process*\n\n` +
         `Usage: \`/process <audio> <video> <delay_ms>\`\n\n` +
         `This command:\n` +
         `1. Analyzes both files\n` +
@@ -1496,19 +1496,19 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     const delayMs = parseInt(args[2], 10);
 
     if (!existsSync(audioPath)) {
-      await ctx.reply('❌ Audio file not found: ' + audioPath);
+      await ctx.reply('[ERR] Audio file not found: ' + audioPath);
       return;
     }
     if (!existsSync(videoPath)) {
-      await ctx.reply('❌ Video file not found: ' + videoPath);
+      await ctx.reply('[ERR] Video file not found: ' + videoPath);
       return;
     }
     if (isNaN(delayMs)) {
-      await ctx.reply('❌ Invalid delay value');
+      await ctx.reply('[ERR] Invalid delay value');
       return;
     }
 
-    const progressMsg = await ctx.reply(`⚙️ Starting full sync process...\n\n⏳ This may take several minutes. Bot remains responsive.`);
+    const progressMsg = await ctx.reply(`Starting full sync process...\n\nThis may take several minutes. Bot remains responsive.`);
     const chatId = ctx.chat!.id;
     const msgId = progressMsg.message_id;
 
@@ -1544,8 +1544,8 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         const tempoFactor = sourceFps / videoFps;
         
         await ctx.api.editMessageText(chatId, msgId,
-          `⚙️ Processing...\n\n` +
-          `FPS: ${sourceFps} ➔ ${videoFps.toFixed(3)}\n` +
+          `Processing...\n\n` +
+          `FPS: ${sourceFps} -> ${videoFps.toFixed(3)}\n` +
           `Tempo: ${tempoFactor.toFixed(6)}\n` +
           `Delay: ${delayMs}ms`
         );
@@ -1592,20 +1592,20 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         await ctx.api.editMessageText(
           chatId,
           msgId,
-          `✅ *Sync Complete!*\n\n` +
+          `[OK] *Sync Complete!*\n\n` +
           `Input: \`${basename(audioPath)}\`\n` +
           `Output: \`${outputPath}\`\n\n` +
           `Applied:\n` +
-          `• FPS: ${sourceFps} ➔ ${videoFps.toFixed(3)}\n` +
-          `• Tempo: ${tempoFactor.toFixed(6)}\n` +
-          `• Delay: ${delayMs}ms\n` +
-          `• Time: ${elapsed}s`,
+          `- FPS: ${sourceFps} -> ${videoFps.toFixed(3)}\n` +
+          `- Tempo: ${tempoFactor.toFixed(6)}\n` +
+          `- Delay: ${delayMs}ms\n` +
+          `- Time: ${elapsed}s`,
           { parse_mode: 'Markdown' }
         );
         logger.info({ audioPath, videoPath, outputPath, tempoFactor, delayMs, elapsed }, 'Full sync process completed');
       } catch (err) {
         logger.error({ err }, 'Process failed');
-        await ctx.api.editMessageText(chatId, msgId, '❌ Failed: ' + (err instanceof Error ? err.message : 'Unknown'));
+        await ctx.api.editMessageText(chatId, msgId, '[ERR] Failed: ' + (err instanceof Error ? err.message : 'Unknown'));
       }
     });
   });
@@ -1620,7 +1620,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       const storageDir = config.storage.working;
       
       if (!existsSync(storageDir)) {
-        await ctx.reply(`📂 Output directory not found.\n\nPath: \`${storageDir}\`\n\nNo files have been created yet.`, { parse_mode: 'Markdown' });
+        await ctx.reply(`Output directory not found.\n\nPath: \`${storageDir}\`\n\nNo files have been created yet.`, { parse_mode: 'Markdown' });
         return;
       }
 
@@ -1639,7 +1639,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         .slice(0, 15);
 
       if (files.length === 0) {
-        await ctx.reply(`📂 *Output Directory*\n\n\`${storageDir}\`\n\n📭 No files found.`, { parse_mode: 'Markdown' });
+        await ctx.reply(`*Output Directory*\n\n\`${storageDir}\`\n\nNo files found.`, { parse_mode: 'Markdown' });
         return;
       }
 
@@ -1655,18 +1655,18 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
           : age < 3600000 ? `${Math.floor(age / 60000)}m ago`
           : age < 86400000 ? `${Math.floor(age / 3600000)}h ago`
           : `${Math.floor(age / 86400000)}d ago`;
-        return `${i + 1}. \`${f.name}\`\n   ${formatSize(f.size)} • ${ageStr}`;
+        return `${i + 1}. \`${f.name}\`\n   ${formatSize(f.size)} - ${ageStr}`;
       }).join('\n\n');
 
       await ctx.reply(
-        `📂 *Recent Output Files*\n\n` +
-        `📁 \`${storageDir}\`\n\n` +
+        `*Recent Output Files*\n\n` +
+        `Path: \`${storageDir}\`\n\n` +
         `${fileList}`,
         { parse_mode: 'Markdown' }
       );
     } catch (err) {
       logger.error({ err }, 'Files list failed');
-      await ctx.reply('❌ Failed to list files');
+      await ctx.reply('[ERR] Failed to list files');
     }
   });
 
@@ -1676,9 +1676,9 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     const exists = existsSync(storageDir);
     
     await ctx.reply(
-      `📁 *Output Directory*\n\n` +
+      `*Output Directory*\n\n` +
       `Path: \`${storageDir}\`\n` +
-      `Status: ${exists ? '✅ Exists' : '⚠️ Will be created on first use'}\n\n` +
+      `Status: ${exists ? '[OK] Exists' : '[WARN] Will be created on first use'}\n\n` +
       `All relative output paths will be saved here.\n` +
       `Use absolute paths to save elsewhere.`,
       { parse_mode: 'Markdown' }
@@ -1693,7 +1693,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
   // Handle unknown commands
   bot.on('message:text', async (ctx) => {
     if (ctx.message.text.startsWith('/')) {
-      await ctx.reply('❓ Unknown command. Use /help to see available commands.');
+      await ctx.reply('Unknown command. Use /help to see available commands.');
     }
   });
 

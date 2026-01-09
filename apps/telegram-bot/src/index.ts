@@ -2,7 +2,7 @@
  * Telegram Bot Entry Point
  * 
  * Provides a Telegram interface to control media-bot.
- * Admin-only access, bypasses API authentication.
+ * Works in multiple groups and private chats.
  */
 
 import { Bot, Context, session, GrammyError, HttpError } from 'grammy';
@@ -63,28 +63,53 @@ async function main(): Promise<void> {
     await next();
   });
 
-  // Admin check middleware
+  // Access control middleware - allows all members in allowed groups
   bot.use(async (ctx, next) => {
-    const userId = ctx.from?.id;
+    const chatId = ctx.chat?.id?.toString();
+    const chatType = ctx.chat?.type;
+    const userId = ctx.from?.id?.toString();
     
-    // Allow only admin
-    if (userId && userId.toString() === config.adminId) {
-      await next();
-    } else if (ctx.chat?.id.toString() === config.groupChatId) {
-      // Allow in group chat (for notifications) but check admin for commands
-      if (ctx.message?.text?.startsWith('/')) {
-        if (userId && userId.toString() === config.adminId) {
-          await next();
-        } else {
-          await ctx.reply('⛔ Only admin can use bot commands.');
-        }
-      } else {
+    // Check if this is a private chat
+    if (chatType === 'private') {
+      if (config.allowPrivate) {
+        // Allow all private chats
         await next();
+      } else if (userId && userId === config.adminId) {
+        // Only admin in private if private chats disabled
+        await next();
+      } else {
+        logger.warn({ userId }, 'Private chat not allowed');
+        await ctx.reply('This bot only works in group chats.');
       }
-    } else {
-      logger.warn({ userId }, 'Unauthorized user attempted access');
-      await ctx.reply('⛔ You are not authorized to use this bot.');
+      return;
     }
+    
+    // Check if this is a group/supergroup
+    if (chatType === 'group' || chatType === 'supergroup') {
+      // If no allowed groups configured, allow all groups
+      if (config.allowedGroups.length === 0) {
+        await next();
+        return;
+      }
+      
+      // Check if group is in allowed list
+      if (chatId && config.allowedGroups.includes(chatId)) {
+        await next();
+      } else {
+        logger.warn({ chatId, chatType }, 'Group not in allowed list');
+        // Don't reply in unauthorized groups to avoid spam
+      }
+      return;
+    }
+    
+    // Allow channel posts (for future use)
+    if (chatType === 'channel') {
+      await next();
+      return;
+    }
+    
+    // Default: allow
+    await next();
   });
 
   // Register all commands
@@ -120,8 +145,9 @@ async function main(): Promise<void> {
     onStart: (botInfo) => {
       logger.info({ 
         username: botInfo.username,
-        adminId: config.adminId,
-        groupChatId: config.groupChatId,
+        adminId: config.adminId ?? 'not set',
+        allowedGroups: config.allowedGroups.length > 0 ? config.allowedGroups : 'all groups allowed',
+        allowPrivate: config.allowPrivate,
       }, 'Bot started');
     },
   });

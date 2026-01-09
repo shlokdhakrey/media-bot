@@ -15,11 +15,11 @@ export function printError(message: string): void {
 }
 
 export function printWarning(message: string): void {
-  console.warn(chalk.yellow('⚠'), message);
+  console.warn(chalk.yellow('!'), message);
 }
 
 export function printInfo(message: string): void {
-  console.log(chalk.blue('ℹ'), message);
+  console.log(chalk.blue('i'), message);
 }
 
 export function printTable(data: Record<string, unknown>[]): void {

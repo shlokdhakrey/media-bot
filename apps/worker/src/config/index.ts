@@ -3,11 +3,24 @@
  */
 
 import { config as dotenvConfig } from 'dotenv';
-import { resolve } from 'path';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { z } from 'zod';
 
-// Load .env from project root
-dotenvConfig({ path: resolve(process.cwd(), '../../.env') });
+// Get monorepo root
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const monorepoRoot = resolve(__dirname, '../../../..');
+
+// Load .env from monorepo root
+dotenvConfig({ path: resolve(monorepoRoot, '.env') });
+
+// Helper to resolve relative paths from monorepo root
+function resolvePath(p: string): string {
+  if (p.startsWith('./') || p.startsWith('../')) {
+    return resolve(monorepoRoot, p);
+  }
+  return p;
+}
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -21,12 +34,12 @@ const envSchema = z.object({
   // Redis
   REDIS_URL: z.string().min(1),
   
-  // Storage paths
-  STORAGE_INCOMING: z.string().default('/data/incoming'),
-  STORAGE_WORKING: z.string().default('/data/working'),
-  STORAGE_PROCESSED: z.string().default('/data/processed'),
-  STORAGE_SAMPLES: z.string().default('/data/samples'),
-  STORAGE_FAILED: z.string().default('/data/failed'),
+  // Storage paths (relative to monorepo root)
+  STORAGE_INCOMING: z.string().default('./storage/incoming'),
+  STORAGE_WORKING: z.string().default('./storage/working'),
+  STORAGE_PROCESSED: z.string().default('./storage/processed'),
+  STORAGE_SAMPLES: z.string().default('./storage/samples'),
+  STORAGE_FAILED: z.string().default('./storage/failed'),
   
   // Media tools
   FFMPEG_PATH: z.string().default('ffmpeg'),
@@ -47,7 +60,7 @@ const envSchema = z.object({
 const parseResult = envSchema.safeParse(process.env);
 
 if (!parseResult.success) {
-  console.error('❌ Invalid environment configuration:');
+  console.error('Invalid environment configuration:');
   console.error(parseResult.error.format());
   process.exit(1);
 }
@@ -69,11 +82,11 @@ export const config = {
   },
   
   storage: {
-    incoming: env.STORAGE_INCOMING,
-    working: env.STORAGE_WORKING,
-    processed: env.STORAGE_PROCESSED,
-    samples: env.STORAGE_SAMPLES,
-    failed: env.STORAGE_FAILED,
+    incoming: resolvePath(env.STORAGE_INCOMING),
+    working: resolvePath(env.STORAGE_WORKING),
+    processed: resolvePath(env.STORAGE_PROCESSED),
+    samples: resolvePath(env.STORAGE_SAMPLES),
+    failed: resolvePath(env.STORAGE_FAILED),
   },
   
   mediaTools: {

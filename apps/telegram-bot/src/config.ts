@@ -9,7 +9,16 @@ import { z } from 'zod';
 
 // Load .env from monorepo root
 const __dirname = dirname(fileURLToPath(import.meta.url));
-dotenvConfig({ path: resolve(__dirname, '../../../.env') });
+const monorepoRoot = resolve(__dirname, '../../..');
+dotenvConfig({ path: resolve(monorepoRoot, '.env') });
+
+// Helper to resolve relative paths from monorepo root
+function resolvePath(p: string): string {
+  if (p.startsWith('./') || p.startsWith('../')) {
+    return resolve(monorepoRoot, p);
+  }
+  return p;
+}
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -17,8 +26,9 @@ const envSchema = z.object({
   
   // Telegram
   TELEGRAM_BOT_TOKEN: z.string().min(1),
-  TELEGRAM_GROUP_CHAT_ID: z.string().optional(),
-  TELEGRAM_ADMIN_ID: z.string().min(1),
+  TELEGRAM_ALLOWED_GROUPS: z.string().optional(), // Comma-separated list of group IDs
+  TELEGRAM_ADMIN_ID: z.string().optional(), // Optional admin ID for privileged commands
+  TELEGRAM_ALLOW_PRIVATE: z.string().transform(v => v === 'true').default('true'), // Allow private chats
   
   // Database
   DATABASE_URL: z.string().min(1),
@@ -29,10 +39,10 @@ const envSchema = z.object({
   // API URL for internal calls
   API_URL: z.string().url().default('http://localhost:3000'),
   
-  // Storage paths
-  STORAGE_WORKING: z.string().default('C:\\Users\\shlok\\Downloads\\MediaBot'),
-  STORAGE_PROCESSED: z.string().default('C:\\Users\\shlok\\Downloads\\MediaBot\\processed'),
-  STORAGE_SAMPLES: z.string().default('C:\\Users\\shlok\\Downloads\\MediaBot\\samples'),
+  // Storage paths (relative to monorepo root)
+  STORAGE_WORKING: z.string().default('./storage/working'),
+  STORAGE_PROCESSED: z.string().default('./storage/processed'),
+  STORAGE_SAMPLES: z.string().default('./storage/samples'),
   
   // Google Drive API
   GDRIVE_API_KEY: z.string().default(''),
@@ -41,7 +51,7 @@ const envSchema = z.object({
 const parseResult = envSchema.safeParse(process.env);
 
 if (!parseResult.success) {
-  console.error('❌ Invalid environment configuration:');
+  console.error('Invalid environment configuration:');
   console.error(parseResult.error.format());
   process.exit(1);
 }
@@ -53,8 +63,9 @@ export const config = {
   logLevel: env.LOG_LEVEL,
   
   botToken: env.TELEGRAM_BOT_TOKEN,
-  groupChatId: env.TELEGRAM_GROUP_CHAT_ID,
+  allowedGroups: env.TELEGRAM_ALLOWED_GROUPS?.split(',').map(id => id.trim()).filter(Boolean) ?? [],
   adminId: env.TELEGRAM_ADMIN_ID,
+  allowPrivate: env.TELEGRAM_ALLOW_PRIVATE,
   
   database: {
     url: env.DATABASE_URL,
@@ -67,9 +78,9 @@ export const config = {
   apiUrl: env.API_URL,
   
   storage: {
-    working: env.STORAGE_WORKING,
-    processed: env.STORAGE_PROCESSED,
-    samples: env.STORAGE_SAMPLES,
+    working: resolvePath(env.STORAGE_WORKING),
+    processed: resolvePath(env.STORAGE_PROCESSED),
+    samples: resolvePath(env.STORAGE_SAMPLES),
   },
   
   gdrive: {
