@@ -22,15 +22,17 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # Copy package files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY packages/config/package.json ./packages/config/
-COPY packages/database/package.json ./packages/database/
-COPY packages/download/package.json ./packages/download/
+COPY packages/core/package.json ./packages/core/
+COPY packages/acquisition/package.json ./packages/acquisition/
 COPY packages/media/package.json ./packages/media/
+COPY packages/packaging/package.json ./packages/packaging/
 COPY packages/processing/package.json ./packages/processing/
 COPY packages/sync/package.json ./packages/sync/
+COPY packages/upload/package.json ./packages/upload/
 COPY packages/utils/package.json ./packages/utils/
 COPY packages/validation/package.json ./packages/validation/
 COPY apps/api/package.json ./apps/api/
+COPY prisma ./prisma/
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
@@ -39,7 +41,7 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 
 # Generate Prisma client
-RUN pnpm --filter @media-bot/database run generate
+RUN pnpm run db:generate
 
 # Build all packages
 RUN pnpm run build

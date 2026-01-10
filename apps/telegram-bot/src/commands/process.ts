@@ -21,6 +21,7 @@ import { config } from '../config.js';
 import { MediaAnalyzer } from '@media-bot/media';
 import { execFFmpeg, execMkvmerge } from '@media-bot/utils';
 import { GDriveApiClient, type GDriveProgress } from '@media-bot/acquisition';
+import { AudioSyncAnalyzer, type SyncAnalysisResult as ProfessionalSyncResult } from '@media-bot/sync';
 
 /**
  * Download result interface
@@ -44,6 +45,10 @@ interface SyncAnalysisResult {
   tempoFactor: number;
   delayMs: number;
   confidence: number;
+  /** Professional analysis results if available */
+  professionalAnalysis?: ProfessionalSyncResult;
+  /** Was professional analysis used? */
+  usedProfessionalAnalysis: boolean;
 }
 
 /**
@@ -227,17 +232,20 @@ async function downloadFile(
 
 /**
  * Analyze files and determine sync parameters
+ * Uses the professional AudioSyncAnalyzer for waveform-based analysis
  */
 async function analyzeSync(
   videoPath: string,
   audioPath: string,
-  logger: Logger
+  logger: Logger,
+  options: { useProfessionalAnalysis?: boolean } = {}
 ): Promise<SyncAnalysisResult> {
-  const analyzer = new MediaAnalyzer();
+  const mediaAnalyzer = new MediaAnalyzer();
+  const useProfessional = options.useProfessionalAnalysis ?? true;
 
   const [videoResult, audioResult] = await Promise.all([
-    analyzer.analyze(videoPath),
-    analyzer.analyze(audioPath),
+    mediaAnalyzer.analyze(videoPath),
+    mediaAnalyzer.analyze(audioPath),
   ]);
 
   const videoMeta = videoResult.metadata;
@@ -276,15 +284,70 @@ async function analyzeSync(
     }
   }
 
-  // Calculate delay after tempo correction
+  // Calculate delay after tempo correction (basic method)
   const projectedDuration = audioDuration * tempoFactor;
-  const delayMs = Math.round((videoDuration - projectedDuration) * 1000);
+  let delayMs = Math.round((videoDuration - projectedDuration) * 1000);
+
+  // Confidence based on how well the pattern matches
+  let confidence = bestMatch < 0.5 ? 0.95 : bestMatch < 2 ? 0.8 : bestMatch < 5 ? 0.6 : 0.4;
+
+  // Try professional audio sync analysis (waveform comparison like Audacity)
+  let professionalAnalysis: ProfessionalSyncResult | undefined;
+  let usedProfessionalAnalysis = false;
+
+  if (useProfessional) {
+    try {
+      logger.info('Running professional audio sync analysis (waveform comparison)...');
+      
+      const syncAnalyzer = new AudioSyncAnalyzer({
+        useFingerprinting: true,
+        deepAnalysis: false, // Use fast mode for initial analysis
+        maxOffsetSec: 30,
+        minConfidence: 0.5,
+      });
+
+      // Extract audio from video for comparison
+      professionalAnalysis = await syncAnalyzer.analyze(videoPath, audioPath);
+      
+      if (professionalAnalysis.confidence > 0.6) {
+        usedProfessionalAnalysis = true;
+        
+        // Use professional analysis results
+        delayMs = professionalAnalysis.globalDelayMs;
+        confidence = professionalAnalysis.confidence;
+
+        // Check for tempo/drift issues
+        if (professionalAnalysis.hasDrift) {
+          const driftInfo = `Drift detected: ${professionalAnalysis.driftRate.toFixed(2)}ms/sec`;
+          logger.warn({ driftRate: professionalAnalysis.driftRate }, driftInfo);
+        }
+
+        // Apply recommended tempo if provided
+        if (professionalAnalysis.correction.parameters.tempoFactor) {
+          tempoFactor = professionalAnalysis.correction.parameters.tempoFactor;
+        }
+
+        logger.info({
+          method: 'professional',
+          status: professionalAnalysis.status,
+          delayMs,
+          confidence,
+          isSameSource: professionalAnalysis.isSameSource,
+          similarity: professionalAnalysis.similarity,
+          hasDrift: professionalAnalysis.hasDrift,
+          hasStructuralDifferences: professionalAnalysis.hasStructuralDifferences,
+        }, 'Professional sync analysis completed');
+      } else {
+        logger.info({ confidence: professionalAnalysis.confidence }, 
+          'Professional analysis confidence too low, using duration-based analysis');
+      }
+    } catch (error) {
+      logger.warn({ error }, 'Professional sync analysis failed, falling back to duration-based');
+    }
+  }
 
   // Determine if sync is needed
   const needsSync = Math.abs(tempoFactor - 1.0) > 0.0001 || Math.abs(delayMs) > 50;
-
-  // Confidence based on how well the pattern matches
-  const confidence = bestMatch < 0.5 ? 0.95 : bestMatch < 2 ? 0.8 : bestMatch < 5 ? 0.6 : 0.4;
 
   logger.info({
     videoFps,
@@ -293,6 +356,7 @@ async function analyzeSync(
     delayMs,
     confidence,
     needsSync,
+    usedProfessionalAnalysis,
   }, 'Sync analysis completed');
 
   return {
@@ -304,6 +368,8 @@ async function analyzeSync(
     tempoFactor,
     delayMs,
     confidence,
+    professionalAnalysis,
+    usedProfessionalAnalysis,
   };
 }
 
@@ -666,15 +732,23 @@ export function registerProcessCommand(
         syncedAudioPath = join(workDir, `${audioBasename}_synced${originalExt}`);
 
         if (syncResult.needsSync) {
+          const analysisMethod = syncResult.usedProfessionalAnalysis ? '🎯 Professional (Waveform)' : '📊 Duration-based';
+          const professionalInfo = syncResult.professionalAnalysis 
+            ? `\nSimilarity: ${(syncResult.professionalAnalysis.similarity * 100).toFixed(0)}%` +
+              (syncResult.professionalAnalysis.hasDrift ? `\n⚠️ Drift: ${syncResult.professionalAnalysis.driftRate.toFixed(2)}ms/s` : '') +
+              (syncResult.professionalAnalysis.hasStructuralDifferences ? `\n⚠️ Structural changes detected` : '')
+            : '';
+          
           await updateStatus(
             `[PIPELINE] *Process Pipeline*\n\n` +
             `[OK] Video: \`${videoResult.fileName}\`\n` +
             `[OK] Audio: \`${audioResult.fileName}\`\n\n` +
             `[SYNC] *Step 3/5: Syncing Audio*\n` +
+            `Method: ${analysisMethod}\n` +
             `FPS: ${syncResult.audioFps} -> ${syncResult.videoFps.toFixed(3)}\n` +
             `Tempo: ${syncResult.tempoFactor.toFixed(6)}\n` +
             `Delay: ${syncResult.delayMs}ms\n` +
-            `Confidence: ${(syncResult.confidence * 100).toFixed(0)}%\n` +
+            `Confidence: ${(syncResult.confidence * 100).toFixed(0)}%${professionalInfo}\n` +
             `(waiting) Processing...`
           );
 
@@ -734,6 +808,13 @@ export function registerProcessCommand(
         const muxedStats = await fs.stat(muxedPath);
         const sampleStats = await fs.stat(samplePath);
 
+        const analysisMethod = syncResult.usedProfessionalAnalysis ? '🎯 Professional (Waveform)' : '📊 Duration-based';
+        const professionalInfo = syncResult.professionalAnalysis 
+          ? `| Similarity: ${(syncResult.professionalAnalysis.similarity * 100).toFixed(0)}%\n` +
+            (syncResult.professionalAnalysis.hasDrift ? `| ⚠️ Drift: ${syncResult.professionalAnalysis.driftRate.toFixed(2)}ms/s\n` : '') +
+            (syncResult.professionalAnalysis.hasStructuralDifferences ? `| ⚠️ Structural changes\n` : '')
+          : '';
+
         await ctx.api.editMessageText(
           chatId,
           msgId,
@@ -743,12 +824,14 @@ export function registerProcessCommand(
           `[AUDIO] *Audio:* \`${audioResult.fileName}\`\n` +
           `------------------------\n\n` +
           `[SYNC] *Sync Analysis:*\n` +
+          `| Method: ${analysisMethod}\n` +
           `| Video FPS: ${syncResult.videoFps.toFixed(3)}\n` +
           `| Audio FPS: ${syncResult.audioFps}\n` +
           `| Tempo: ${syncResult.tempoFactor.toFixed(6)}x\n` +
           `| Delay: ${syncResult.delayMs}ms\n` +
-          `| Confidence: ${(syncResult.confidence * 100).toFixed(0)}%\n\n` +
-          `[PKG] *Output:*\n` +
+          `| Confidence: ${(syncResult.confidence * 100).toFixed(0)}%\n` +
+          professionalInfo +
+          `\n[PKG] *Output:*\n` +
           `| File: \`${basename(muxedPath)}\`\n` +
           `| Size: ${formatSize(muxedStats.size)}\n` +
           `| Path: \`${dirname(muxedPath)}\`\n\n` +

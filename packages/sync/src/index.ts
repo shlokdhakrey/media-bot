@@ -12,24 +12,68 @@
  * - Never apply multiple corrections blindly
  * 
  * Detection methods:
- * - Silence detection (find actual audio start/end)
- * - Anchor alignment (match audio events to video)
- * - Multi-point verification (start, middle, end)
+ * - Cross-correlation (precise waveform alignment)
+ * - Peak/transient matching (anchor point alignment)
+ * - Audio fingerprinting (source verification)
+ * - Silence detection (boundary detection)
+ * - Multi-segment analysis (drift/cut detection)
  * 
  * Correction types:
  * - Delay (adelay) - shift audio in time
  * - Stretch (atempo) - change audio speed
  * - Trim - remove audio from start/end
  * - Pad - add silence to start/end
+ * - Segment repair - fix cuts/insertions
  * - Reject - no safe correction possible
  */
 
-// Detection
-export { SilenceDetector, type SilenceResult } from './detection/silence.js';
-export { AnchorDetector, type AnchorResult } from './detection/anchor.js';
+// Core detection modules
+export { SilenceDetector, type SilenceResult, type SilenceRegion } from './detection/silence.js';
+export { 
+  AnchorDetector, 
+  type AnchorResult, 
+  type AnchorPoint, 
+  type AnchorMatchResult,
+  type AnchorDetectorOptions,
+} from './detection/anchor.js';
+
+// Advanced detection (new professional analysis)
+export { 
+  CrossCorrelationEngine, 
+  type CrossCorrelationResult,
+  type WaveformData,
+  type CorrelationResult,
+} from './detection/crossCorrelation.js';
+
+export {
+  PeakDetector,
+  type AudioPeak,
+  type PeakDetectionResult,
+  type PeakMatchResult,
+} from './detection/peakDetector.js';
+
+export {
+  AudioFingerprintAnalyzer,
+  type AudioFingerprint,
+  type FingerprintMatch,
+  type FingerprintCompareResult,
+} from './detection/fingerprint.js';
+
+export {
+  AudioSyncAnalyzer,
+  type SyncAnalysisResult,
+  type SyncSegment,
+  type SyncEvent,
+  type StructuralDifference,
+  type SyncAnalyzerOptions,
+} from './detection/syncAnalyzer.js';
 
 // Decision engine
-export { SyncDecisionEngine, type SyncDecision } from './decisionEngine.js';
+export { 
+  SyncDecisionEngine, 
+  type SyncDecision,
+  type SyncDecisionEngineOptions,
+} from './decisionEngine.js';
 
 // Correction planner
 export { CorrectionPlanner, type CorrectionPlan } from './correctionPlanner.js';

@@ -195,6 +195,9 @@ importers:
       '@media-bot/media':
         specifier: workspace:*
         version: link:../../packages/media
+      '@media-bot/sync':
+        specifier: workspace:*
+        version: link:../../packages/sync
       '@media-bot/utils':
         specifier: workspace:*
         version: link:../../packages/utils

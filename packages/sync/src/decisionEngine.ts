@@ -9,10 +9,25 @@
  * 3. Must verify sync at multiple points (start, middle, end)
  * 4. Must detect DRIFT (progressive offset) vs OFFSET (constant delay)
  * 5. Never assume - always verify
+ * 
+ * Now uses the new professional audio sync analysis:
+ * - Cross-correlation for precise offset detection
+ * - Peak matching for anchor point alignment
+ * - Fingerprinting for source verification
+ * - Multi-segment analysis for cut/drift detection
  */
 
 import type { SyncAnalysis, SyncIssue, CorrectionType } from './types.js';
 import type { MediaMetadata } from '@media-bot/media';
+import { executeCommand } from '@media-bot/utils';
+import { createLogger } from '@media-bot/utils';
+import { AudioSyncAnalyzer, type SyncAnalysisResult } from './detection/syncAnalyzer.js';
+import { AnchorDetector } from './detection/anchor.js';
+import * as path from 'path';
+import * as os from 'os';
+import * as fs from 'fs/promises';
+
+const logger = createLogger({ module: 'sync-decision-engine' });
 
 export interface SyncDecision {
   // Should we proceed with correction?
@@ -29,6 +44,11 @@ export interface SyncDecision {
     trimEndMs?: number;     // For trim
     padStartMs?: number;    // For pad
     padEndMs?: number;      // For pad
+    segmentCorrections?: Array<{
+      startMs: number;
+      endMs: number;
+      delayMs: number;
+    }>;
   };
   
   // Confidence in this decision
@@ -42,37 +62,309 @@ export interface SyncDecision {
   
   // Full analysis data
   analysis: SyncAnalysis;
+  
+  // Raw sync analyzer result (if available)
+  rawAnalysis?: SyncAnalysisResult;
+}
+
+export interface SyncDecisionEngineOptions {
+  ffmpegPath?: string;
+  fpcalcPath?: string;
+  tempDir?: string;
+  maxOffsetSec?: number;
+  deepAnalysis?: boolean;
 }
 
 export class SyncDecisionEngine {
   // Thresholds (in milliseconds)
-  private readonly SYNC_TOLERANCE_MS = 20;         // Acceptable sync variance
+  private readonly SYNC_TOLERANCE_MS = 30;         // Acceptable sync variance
   private readonly MINOR_OFFSET_MS = 50;           // Minor issue threshold
   private readonly MODERATE_OFFSET_MS = 200;       // Moderate issue threshold
   private readonly SEVERE_OFFSET_MS = 500;         // Severe issue threshold
   private readonly DRIFT_THRESHOLD_MS_PER_SEC = 0.5; // Drift detection threshold
+
+  private syncAnalyzer: AudioSyncAnalyzer;
+  private anchorDetector: AnchorDetector;
+  private ffmpegPath: string;
+  private tempDir: string;
+
+  constructor(options: SyncDecisionEngineOptions = {}) {
+    this.ffmpegPath = options.ffmpegPath ?? 'ffmpeg';
+    this.tempDir = options.tempDir ?? os.tmpdir();
+
+    this.syncAnalyzer = new AudioSyncAnalyzer({
+      ffmpegPath: this.ffmpegPath,
+      fpcalcPath: options.fpcalcPath,
+      tempDir: this.tempDir,
+      maxOffsetSec: options.maxOffsetSec ?? 30,
+      deepAnalysis: options.deepAnalysis ?? false,
+    });
+
+    this.anchorDetector = new AnchorDetector({
+      ffmpegPath: this.ffmpegPath,
+      fpcalcPath: options.fpcalcPath,
+      maxOffsetSec: options.maxOffsetSec ?? 30,
+      deepAnalysis: options.deepAnalysis ?? false,
+    });
+  }
 
   /**
    * Analyze sync between video and audio files
    * Returns a decision on whether and how to correct
    */
   async analyze(
-    _videoMeta: MediaMetadata,
-    _audioMeta: MediaMetadata,
-    _videoFile: string,
-    _audioFile: string
+    videoMeta: MediaMetadata,
+    audioMeta: MediaMetadata,
+    videoFile: string,
+    audioFile: string
   ): Promise<SyncDecision> {
-    // TODO: Implement full analysis in Phase 8
-    // This involves:
-    // 1. Extract audio from video
-    // 2. Run silence detection on both
-    // 3. Find anchor points in both
-    // 4. Match anchors to calculate offsets
-    // 5. Verify at multiple points
-    // 6. Detect drift vs constant offset
-    // 7. Make correction decision
+    logger.info({ videoFile, audioFile }, 'Starting sync analysis');
+
+    const reasoning: string[] = [];
+    const warnings: string[] = [];
+
+    // Step 1: Extract audio from video for comparison
+    const extractedAudioPath = await this.extractAudioFromVideo(videoFile);
     
-    throw new Error('Not implemented - Phase 8');
+    try {
+      // Step 2: Run professional sync analysis
+      const syncResult = await this.syncAnalyzer.analyze(extractedAudioPath, audioFile);
+
+      logger.info({
+        status: syncResult.status,
+        globalDelayMs: syncResult.globalDelayMs,
+        confidence: syncResult.confidence,
+        hasDrift: syncResult.hasDrift,
+        hasStructuralDifferences: syncResult.hasStructuralDifferences,
+      }, 'Sync analysis complete');
+
+      // Step 3: Convert to SyncAnalysis format
+      const analysis = this.convertToSyncAnalysis(syncResult, videoFile, audioFile);
+
+      // Step 4: Determine correction based on analysis
+      const correctionDecision = this.determineCorrectionFromAnalysis(syncResult);
+
+      // Build reasoning
+      reasoning.push(`Analysis status: ${syncResult.status}`);
+      reasoning.push(`Global delay: ${syncResult.globalDelayMs}ms`);
+      reasoning.push(`Confidence: ${(syncResult.confidence * 100).toFixed(1)}%`);
+      
+      if (syncResult.hasDrift) {
+        reasoning.push(`Drift detected: ${syncResult.driftRate.toFixed(3)}ms per second`);
+      }
+      
+      if (syncResult.hasStructuralDifferences) {
+        reasoning.push(`Structural differences: ${syncResult.structuralDifferences.length} cuts/insertions detected`);
+      }
+
+      // Add warnings from correction
+      warnings.push(...syncResult.correction.warnings);
+
+      // Determine if we should correct
+      const shouldCorrect = 
+        syncResult.status !== 'in_sync' && 
+        syncResult.status !== 'unsyncable' &&
+        syncResult.confidence > 0.5;
+
+      return {
+        shouldCorrect,
+        correctionType: correctionDecision.type,
+        parameters: correctionDecision.parameters,
+        confidence: syncResult.confidence,
+        reasoning,
+        warnings,
+        analysis,
+        rawAnalysis: syncResult,
+      };
+    } finally {
+      // Cleanup extracted audio
+      try {
+        await fs.unlink(extractedAudioPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  }
+
+  /**
+   * Quick sync check without full analysis
+   */
+  async quickCheck(
+    videoFile: string,
+    audioFile: string
+  ): Promise<{
+    isInSync: boolean;
+    offsetMs: number;
+    confidence: number;
+    needsDetailedAnalysis: boolean;
+  }> {
+    const extractedAudioPath = await this.extractAudioFromVideo(videoFile);
+    
+    try {
+      return await this.anchorDetector.quickSyncCheck(extractedAudioPath, audioFile);
+    } finally {
+      try {
+        await fs.unlink(extractedAudioPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  }
+
+  /**
+   * Extract audio track from video file
+   */
+  private async extractAudioFromVideo(videoFile: string): Promise<string> {
+    const tempPath = path.join(
+      this.tempDir, 
+      `extracted_${Date.now()}_${Math.random().toString(36).slice(2)}.wav`
+    );
+
+    await executeCommand(this.ffmpegPath, [
+      '-i', videoFile,
+      '-vn',
+      '-acodec', 'pcm_s16le',
+      '-ar', '48000',
+      '-ac', '2',
+      '-y',
+      tempPath,
+    ], { timeout: 300000 });
+
+    return tempPath;
+  }
+
+  /**
+   * Convert SyncAnalysisResult to legacy SyncAnalysis format
+   */
+  private convertToSyncAnalysis(
+    result: SyncAnalysisResult,
+    videoFile: string,
+    audioFile: string
+  ): SyncAnalysis {
+    const issues: SyncIssue[] = [];
+
+    // Add issues based on analysis
+    if (result.status === 'offset') {
+      issues.push({
+        type: 'offset',
+        severity: this.classifyOffset(result.globalDelayMs),
+        description: `Audio offset of ${result.globalDelayMs}ms detected`,
+        detectedAt: 'multiple',
+        offsetMs: result.globalDelayMs,
+        confidence: result.confidence,
+      });
+    }
+
+    if (result.hasDrift) {
+      issues.push({
+        type: 'drift',
+        severity: Math.abs(result.driftRate) > 1 ? 'severe' : 'moderate',
+        description: `Audio drift of ${result.driftRate.toFixed(3)}ms/s detected`,
+        detectedAt: 'multiple',
+        offsetMs: result.driftRate * 1000, // Drift per minute
+        confidence: result.confidence,
+      });
+    }
+
+    if (result.hasStructuralDifferences) {
+      for (const diff of result.structuralDifferences) {
+        issues.push({
+          type: 'unknown',
+          severity: 'severe',
+          description: `${diff.type} at ${diff.referenceStartMs}ms (${diff.durationMs}ms)`,
+          detectedAt: 'middle',
+          offsetMs: diff.durationMs,
+          confidence: result.confidence,
+        });
+      }
+    }
+
+    // Calculate verification points from segments
+    const startSegment = result.segments.find(s => s.startMs < 60000);
+    const endSegment = result.segments.find(s => s.endMs > result.metadata.referenceDurationMs - 60000);
+    const middleTime = result.metadata.referenceDurationMs / 2;
+    const middleSegment = result.segments.find(
+      s => s.startMs <= middleTime && s.endMs >= middleTime
+    );
+
+    return {
+      videoFile,
+      audioFile,
+      needsCorrection: result.status !== 'in_sync',
+      issues,
+      confidence: result.confidence,
+      silenceDetection: {
+        audioStartMs: 0,
+        audioEndMs: result.metadata.targetDurationMs,
+        silenceRegions: [],
+      },
+      anchorPoints: result.events
+        .filter(e => e.type === 'anchor_match')
+        .map(e => ({
+          videoTimestampMs: e.timestampMs,
+          audioTimestampMs: e.timestampMs + result.globalDelayMs,
+          offsetMs: result.globalDelayMs,
+          type: 'peak' as const,
+        })),
+      verification: {
+        startOffset: startSegment?.delayMs ?? result.globalDelayMs,
+        middleOffset: middleSegment?.delayMs ?? result.globalDelayMs,
+        endOffset: endSegment?.delayMs ?? result.globalDelayMs,
+        isDriftDetected: result.hasDrift,
+        driftPerSecond: result.driftRate,
+      },
+      analyzedAt: new Date(),
+    };
+  }
+
+  /**
+   * Determine correction from sync analysis result
+   */
+  private determineCorrectionFromAnalysis(
+    result: SyncAnalysisResult
+  ): {
+    type: CorrectionType;
+    parameters: SyncDecision['parameters'];
+  } {
+    const correction = result.correction;
+
+    switch (correction.type) {
+      case 'none':
+        return { type: 'none', parameters: {} };
+
+      case 'delay':
+        return {
+          type: 'delay',
+          parameters: { delayMs: correction.parameters.delayMs },
+        };
+
+      case 'stretch':
+        return {
+          type: 'stretch',
+          parameters: {
+            tempoFactor: correction.parameters.tempoFactor,
+            delayMs: correction.parameters.delayMs,
+          },
+        };
+
+      case 'segment_repair':
+        // Segment repair is complex - use the first segment's correction
+        // or recommend manual review
+        if (correction.parameters.segmentCorrections?.length === 1) {
+          return {
+            type: 'delay',
+            parameters: { delayMs: correction.parameters.segmentCorrections[0]!.delayMs },
+          };
+        }
+        return {
+          type: 'reject',
+          parameters: { segmentCorrections: correction.parameters.segmentCorrections },
+        };
+
+      case 'manual':
+      default:
+        return { type: 'reject', parameters: {} };
+    }
   }
 
   /**

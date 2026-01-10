@@ -18,6 +18,7 @@
     "@media-bot/acquisition": "workspace:*",
     "@media-bot/core": "workspace:*",
     "@media-bot/media": "workspace:*",
+    "@media-bot/sync": "workspace:*",
     "@media-bot/utils": "workspace:*",
     "@prisma/client": "^5.7.0",
     "dotenv": "^17.2.3",
