@@ -9,6 +9,7 @@ import type { Logger } from 'pino';
 import type { BotContext } from '../index.js';
 import { prisma } from '@media-bot/core';
 import { MediaAnalyzer } from '@media-bot/media';
+import { AudioSyncAnalyzer, type SyncAnalysisResult as ProfessionalSyncResult } from '@media-bot/sync';
 import { existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import { join, basename, dirname, extname } from 'node:path';
 import { config } from '../config.js';
@@ -21,6 +22,21 @@ function ensureStorageDir(): string {
     mkdirSync(dir, { recursive: true });
   }
   return dir;
+}
+
+/**
+ * Resolve file path - supports both full paths and filenames
+ * If just a filename is provided, looks in the working directory
+ */
+function resolveFilePath(filePath: string): string {
+  // If it's already an absolute path (Unix or Windows), use it as-is
+  if (filePath.startsWith('/') || filePath.includes(':') || filePath.startsWith('\\\\')) {
+    return filePath;
+  }
+  // Otherwise, assume it's a filename in the working directory
+  const workingDir = ensureStorageDir();
+  const resolvedPath = join(workingDir, filePath);
+  return resolvedPath;
 }
 
 // Get output path - if relative, put in storage dir
@@ -71,27 +87,30 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     await ctx.reply(
       `*Media-Bot Control Panel*\n\n` +
       `Welcome! Use these commands:\n\n` +
-      `*ALL-IN-ONE*\n` +
-      `/process <video> <audio> - Full pipeline\n\n` +
-      `*Downloads*\n` +
+      `*🚀 ALL-IN-ONE PIPELINE*\n` +
+      `/process "video" "audio" - Full pipeline\n` +
+      `  ↳ Download → Sync → Mux → Sample\n` +
+      `  ↳ Supports: GDrive, HTTP, Local paths\n\n` +
+      `*📥 Downloads*\n` +
       `/download <url> - Start download\n` +
       `/gdrive <link> - Download from GDrive\n` +
       `/jobs - List all jobs\n` +
       `/status <id> - Job status\n` +
       `/cancel <id> - Cancel job\n\n` +
-      `*Media*\n` +
+      `*🎬 Media*\n` +
       `/analyze <path> - Analyze file\n` +
       `/releases - List releases\n\n` +
-      `*Sync*\n` +
-      `/sync <video> <audio> - Sync analysis\n` +
+      `*🎯 Sync (Professional)*\n` +
+      `/sync "video" "audio" - Pro sync analysis\n` +
+      `  ↳ Waveform comparison (like Audacity)\n` +
       `/delay <ms> <in> <out> - Add delay\n` +
       `/fps <src> <tgt> <in> <out> - FPS convert\n` +
       `/tempo <factor> <in> <out> - Tempo adjust\n` +
       `/mux <video> <audio> <out> - Mux files\n\n` +
-      `*Files*\n` +
+      `*📁 Files*\n` +
       `/files - List output files\n` +
       `/dir - Show output directory\n\n` +
-      `*System*\n` +
+      `*⚙️ System*\n` +
       `/health - System health\n` +
       `/stats - Statistics\n` +
       `/binaries - Show binary paths\n` +
@@ -131,13 +150,21 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
 
     if (topic === 'sync') {
       await ctx.reply(
-        `*/sync* - Sync Analysis\n\n` +
+        `*/sync* - Professional Sync Analysis\n\n` +
         `*Usage:*\n` +
         `\`/sync "video_path" "audio_path" [title]\`\n\n` +
-        `Analyzes video and audio files to detect:\n` +
+        `*What it does:*\n` +
+        `1. Analyzes both files\n` +
+        `2. Runs waveform comparison (like Audacity)\n` +
+        `3. Detects exact delay using cross-correlation\n` +
+        `4. Identifies drift and structural changes\n` +
+        `5. Provides correction commands\n\n` +
+        `*Detects:*\n` +
         `- FPS mismatch (24 vs 25, etc.)\n` +
         `- Duration differences\n` +
-        `- Required tempo & delay corrections\n\n` +
+        `- Audio similarity & source verification\n` +
+        `- Drift (progressive offset)\n` +
+        `- Structural changes (cuts/insertions)\n\n` +
         `*Example:*\n` +
         `\`/sync "C:\\Movie.mkv" "C:\\Hindi.mka" "Hindi DD+ 5.1"\``,
         { parse_mode: 'Markdown' }
@@ -765,15 +792,16 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
   // /analyze <path> - Analyze media file
   bot.command('analyze', async (ctx) => {
     const args = ctx.message?.text?.split(' ').slice(1) ?? [];
-    const filePath = args.join(' ');
+    const fileArg = args.join(' ');
 
-    if (!filePath) {
-      await ctx.reply('Usage: /analyze <file_path>\n\nExample: /analyze C:\\Videos\\movie.mkv');
+    if (!fileArg) {
+      await ctx.reply('Usage: /analyze <file_path>\n\nSupports full path or filename in working dir.\nExample: /analyze movie.mkv');
       return;
     }
 
+    const filePath = resolveFilePath(fileArg);
     if (!existsSync(filePath)) {
-      await ctx.reply('[ERR] File not found: ' + filePath);
+      await ctx.reply(`[ERR] File not found: ${filePath}\n\nTip: Use full path or filename in working directory.`);
       return;
     }
 
@@ -873,15 +901,21 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
   // SYNC & PROCESSING COMMANDS
   // ===========================================
 
-  // /sync <video> <audio> [title] - Sync analysis & report
+  // /sync <video> <audio> [title] - Professional Sync analysis & report
   bot.command('sync', async (ctx) => {
     const text = ctx.message?.text ?? '';
     const args = parseQuotedArgs(text.slice('/sync'.length).trim());
     
     if (args.length < 2) {
       await ctx.reply(
-        `*Sync Analysis*\n\n` +
+        `*🎯 Professional Sync Analysis*\n\n` +
         `Usage: \`/sync <video> <audio> [title]\`\n\n` +
+        `This command:\n` +
+        `1. Analyzes both files\n` +
+        `2. Runs waveform comparison (like Audacity)\n` +
+        `3. Detects exact delay using cross-correlation\n` +
+        `4. Identifies drift and structural changes\n` +
+        `5. Provides correction commands\n\n` +
         `Example:\n` +
         `\`/sync "Movie.mkv" "Hindi.mp4" "HS DDP 5.1"\``,
         { parse_mode: 'Markdown' }
@@ -889,20 +923,25 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       return;
     }
 
-    const [videoPath, audioPath, title] = args;
+    const [videoArg, audioArg, title] = args;
+    
+    // Resolve paths - supports both full paths and filenames in working dir
+    const videoPath = resolveFilePath(videoArg);
+    const audioPath = resolveFilePath(audioArg);
     
     if (!existsSync(videoPath)) {
-      await ctx.reply('[ERR] Video file not found: ' + videoPath);
+      await ctx.reply(`[ERR] Video file not found: ${videoPath}\n\nTip: You can use just the filename if the file is in the working directory.`);
       return;
     }
     if (!existsSync(audioPath)) {
-      await ctx.reply('[ERR] Audio file not found: ' + audioPath);
+      await ctx.reply(`[ERR] Audio file not found: ${audioPath}\n\nTip: You can use just the filename if the file is in the working directory.`);
       return;
     }
 
-    const progressMsg = await ctx.reply('Analyzing files for sync...');
+    const progressMsg = await ctx.reply('🔍 Analyzing files...');
 
     try {
+      // Phase 1: Basic media analysis
       const analyzer = new MediaAnalyzer();
       const [videoResult, audioResult] = await Promise.all([
         analyzer.analyze(videoPath),
@@ -924,16 +963,36 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         return;
       }
 
-      // Calculate sync parameters
+      await ctx.api.editMessageText(ctx.chat!.id, progressMsg.message_id, 
+        '🔍 Files analyzed...\n🎵 Running professional waveform analysis (this may take a moment)...');
+
+      // Phase 2: Professional sync analysis using waveform comparison
+      const syncAnalyzer = new AudioSyncAnalyzer({
+        useFingerprinting: true,
+        deepAnalysis: true, // Full analysis for /sync command
+        maxOffsetSec: 60,
+        minConfidence: 0.3,
+      });
+
+      let professionalResult: ProfessionalSyncResult | undefined;
+      let usedProfessional = false;
+
+      try {
+        professionalResult = await syncAnalyzer.analyze(videoPath, audioPath);
+        usedProfessional = professionalResult.confidence > 0.4;
+      } catch (err) {
+        logger.warn({ err }, 'Professional analysis failed, using duration-based fallback');
+      }
+
+      // Calculate sync parameters (basic method as fallback)
       const videoFps = videoStream.fps;
       const audioDuration = audioMeta.duration;
       const videoDuration = videoMeta.duration;
       
-      // Detect audio FPS from duration ratio
       const rawDiff = videoDuration - audioDuration;
       
-      // Calculate what FPS the audio was encoded at
-      let detectedAudioFps = 24; // Default assumption
+      // Detect audio FPS from duration ratio
+      let detectedAudioFps = 24;
       const fpsRatios = [
         { from: 24, to: 23.976, ratio: 24 / 23.976 },
         { from: 25, to: 23.976, ratio: 25 / 23.976 },
@@ -941,7 +1000,6 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         { from: 25, to: 24, ratio: 25 / 24 },
       ];
 
-      // Project audio duration to video FPS
       let projectedDuration = audioDuration;
       let fpsConversionNeeded = false;
       let tempoFactor = 1.0;
@@ -957,11 +1015,18 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         }
       }
 
-      // Calculate remaining delay after FPS conversion
+      // Use professional delay if available, otherwise calculate from duration
       const projectedDiff = videoDuration - projectedDuration;
-      const delayMs = Math.round(projectedDiff * 1000);
+      let delayMs = usedProfessional && professionalResult 
+        ? professionalResult.globalDelayMs 
+        : Math.round(projectedDiff * 1000);
 
-      // Format durations
+      // Override tempo if professional analysis suggests different
+      if (usedProfessional && professionalResult?.correction.parameters.tempoFactor) {
+        tempoFactor = professionalResult.correction.parameters.tempoFactor;
+      }
+
+      // Format helpers
       const formatDur = (s: number) => {
         const h = Math.floor(s / 3600);
         const m = Math.floor((s % 3600) / 60);
@@ -975,6 +1040,11 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       };
 
       // Build report
+      const analysisMethod = usedProfessional ? '🎯 Professional (Waveform)' : '📊 Duration-based';
+      const confidence = usedProfessional && professionalResult 
+        ? (professionalResult.confidence * 100).toFixed(0) + '%'
+        : 'N/A';
+
       let report = `*MEDIA SYNC REPORT*\n`;
       report += `----------------------------\n`;
       report += `[VIDEO] \`${videoMeta.fileName}\` (${formatSize(videoMeta.fileSize)})\n`;
@@ -983,6 +1053,28 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       report += `   - Stream: ${detectedAudioFps} \\[${formatDur(audioDuration)}\\]\n`;
       if (title) report += `   - Title: ${title}\n`;
       report += `----------------------------\n\n`;
+
+      // Professional analysis section
+      report += `*ANALYSIS METHOD*\n`;
+      report += `Method: ${analysisMethod}\n`;
+      report += `Confidence: ${confidence}\n`;
+      if (usedProfessional && professionalResult) {
+        report += `Similarity: ${(professionalResult.similarity * 100).toFixed(0)}%\n`;
+        report += `Status: ${professionalResult.status.replace('_', ' ').toUpperCase()}\n`;
+        if (professionalResult.isSameSource) {
+          report += `✅ Same source audio detected\n`;
+        }
+        if (professionalResult.hasDrift) {
+          report += `⚠️ Drift: ${professionalResult.driftRate.toFixed(2)} ms/sec\n`;
+        }
+        if (professionalResult.hasStructuralDifferences) {
+          report += `⚠️ Structural differences detected\n`;
+          for (const diff of professionalResult.structuralDifferences.slice(0, 3)) {
+            report += `   - ${diff.type}: ${formatDur(diff.referenceStartMs / 1000)}\n`;
+          }
+        }
+      }
+      report += `\n`;
 
       report += `*RAW DATA CHECK*\n\n`;
       report += `\`Stream        FPS     Duration\`\n`;
@@ -1010,6 +1102,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         actions.push(`${actions.length + 1}. Add Delay: ${delayMs} ms`);
         actions.push(`   \`/delay ${delayMs} "input.mka" "output.mka"\``);
       }
+      
       if (actions.length > 0) {
         report += `[WARN] *ACTION REQUIRED*\n`;
         report += actions.join('\n') + '\n';
@@ -1021,17 +1114,26 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       // Quick command summary
       if (fpsConversionNeeded || Math.abs(delayMs) > 10) {
         report += `\n*Quick Command:*\n`;
-        if (fpsConversionNeeded && Math.abs(delayMs) > 10) {
-          report += `\`/process "${audioPath}" "${videoPath}" ${delayMs}\``;
-        } else if (fpsConversionNeeded) {
-          report += `\`/fps ${detectedAudioFps} ${videoFps.toFixed(3)} "${audioPath}" "synced.mka"\``;
-        } else {
-          report += `\`/delay ${delayMs} "${audioPath}" "synced.mka"\``;
+        report += `\`/process "${audioPath}" "${videoPath}" ${delayMs}\``;
+      }
+
+      // Show warnings from professional analysis
+      if (usedProfessional && professionalResult && !professionalResult.correction.isSafe) {
+        report += `\n\n⚠️ *Warnings:*\n`;
+        for (const warning of professionalResult.correction.warnings) {
+          report += `- ${warning}\n`;
         }
       }
 
       await ctx.api.editMessageText(ctx.chat!.id, progressMsg.message_id, report, { parse_mode: 'Markdown' });
-      logger.info({ videoPath, audioPath }, 'Sync analysis completed');
+      logger.info({ 
+        videoPath, 
+        audioPath, 
+        usedProfessional,
+        confidence: professionalResult?.confidence,
+        delayMs,
+        tempoFactor,
+      }, 'Professional sync analysis completed');
     } catch (err) {
       logger.error({ err }, 'Sync analysis failed');
       await ctx.api.editMessageText(ctx.chat!.id, progressMsg.message_id, '[ERR] Sync analysis failed: ' + (err instanceof Error ? err.message : 'Unknown'));
@@ -1058,7 +1160,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     }
 
     const delayMs = parseInt(args[0], 10);
-    const inputPath = args[1];
+    const inputPath = resolveFilePath(args[1]);
     const outputPath = getOutputPath(args[2]);
 
     if (isNaN(delayMs)) {
@@ -1066,7 +1168,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       return;
     }
     if (!existsSync(inputPath)) {
-      await ctx.reply('[ERR] Input file not found: ' + inputPath);
+      await ctx.reply(`[ERR] Input file not found: ${inputPath}\n\nTip: Use full path or filename in working directory.`);
       return;
     }
 
@@ -1136,7 +1238,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
 
     const sourceFps = parseFloat(args[0]);
     const targetFps = parseFloat(args[1]);
-    const inputPath = args[2];
+    const inputPath = resolveFilePath(args[2]);
     const outputPath = getOutputPath(args[3]);
 
     if (isNaN(sourceFps) || isNaN(targetFps)) {
@@ -1144,7 +1246,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       return;
     }
     if (!existsSync(inputPath)) {
-      await ctx.reply('[ERR] Input file not found: ' + inputPath);
+      await ctx.reply(`[ERR] Input file not found: ${inputPath}\n\nTip: Use full path or filename in working directory.`);
       return;
     }
 
@@ -1217,7 +1319,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     }
 
     const tempoFactor = parseFloat(args[0]);
-    const inputPath = args[1];
+    const inputPath = resolveFilePath(args[1]);
     const outputPath = getOutputPath(args[2]);
 
     if (isNaN(tempoFactor) || tempoFactor <= 0) {
@@ -1225,7 +1327,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       return;
     }
     if (!existsSync(inputPath)) {
-      await ctx.reply('[ERR] Input file not found: ' + inputPath);
+      await ctx.reply(`[ERR] Input file not found: ${inputPath}\n\nTip: Use full path or filename in working directory.`);
       return;
     }
 
@@ -1295,11 +1397,11 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
 
     const startTime = args[0];
     const endTime = args[1];
-    const inputPath = args[2];
+    const inputPath = resolveFilePath(args[2]);
     const outputPath = getOutputPath(args[3]);
 
     if (!existsSync(inputPath)) {
-      await ctx.reply('[ERR] Input file not found: ' + inputPath);
+      await ctx.reply(`[ERR] Input file not found: ${inputPath}\n\nTip: Use full path or filename in working directory.`);
       return;
     }
 
@@ -1350,17 +1452,17 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       return;
     }
 
-    const videoPath = args[0];
-    const audioPath = args[1];
+    const videoPath = resolveFilePath(args[0]);
+    const audioPath = resolveFilePath(args[1]);
     const outputPath = getOutputPath(args[2]);
     const title = args[3] || '';
 
     if (!existsSync(videoPath)) {
-      await ctx.reply('[ERR] Video file not found: ' + videoPath);
+      await ctx.reply(`[ERR] Video file not found: ${videoPath}\n\nTip: Use full path or filename in working directory.`);
       return;
     }
     if (!existsSync(audioPath)) {
-      await ctx.reply('[ERR] Audio file not found: ' + audioPath);
+      await ctx.reply(`[ERR] Audio file not found: ${audioPath}\n\nTip: Use full path or filename in working directory.`);
       return;
     }
 
@@ -1430,12 +1532,12 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       return;
     }
 
-    const inputPath = args[0];
+    const inputPath = resolveFilePath(args[0]);
     const streamSpec = args[1];
     const outputPath = getOutputPath(args[2]);
 
     if (!existsSync(inputPath)) {
-      await ctx.reply('[ERR] Input file not found: ' + inputPath);
+      await ctx.reply(`[ERR] Input file not found: ${inputPath}\n\nTip: Use full path or filename in working directory.`);
       return;
     }
 
@@ -1470,37 +1572,38 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     });
   });
 
-  // /process <audio> <video> <delay> - Full sync pipeline (FPS + delay)
-  bot.command('process', async (ctx) => {
+  // /synclocal <audio> <video> <delay> - Local file sync pipeline (FPS + delay) - for files already on disk
+  bot.command('synclocal', async (ctx) => {
     const text = ctx.message?.text ?? '';
-    const args = parseQuotedArgs(text.slice('/process'.length).trim());
+    const args = parseQuotedArgs(text.slice('/synclocal'.length).trim());
     
     if (args.length < 3) {
       await ctx.reply(
-        `*Full Sync Process*\n\n` +
-        `Usage: \`/process <audio> <video> <delay_ms>\`\n\n` +
+        `*Local Sync Process*\n\n` +
+        `Usage: \`/synclocal <audio> <video> <delay_ms>\`\n\n` +
+        `For local files already on disk. For links use /process.\n\n` +
         `This command:\n` +
         `1. Analyzes both files\n` +
         `2. Converts FPS if needed\n` +
         `3. Applies delay\n` +
         `4. Outputs synced audio\n\n` +
         `Example:\n` +
-        `\`/process "Hindi.mp4" "Movie.mkv" 42\``,
+        `\`/synclocal "Hindi.mp4" "Movie.mkv" 42\``,
         { parse_mode: 'Markdown' }
       );
       return;
     }
 
-    const audioPath = args[0];
-    const videoPath = args[1];
+    const audioPath = resolveFilePath(args[0]);
+    const videoPath = resolveFilePath(args[1]);
     const delayMs = parseInt(args[2], 10);
 
     if (!existsSync(audioPath)) {
-      await ctx.reply('[ERR] Audio file not found: ' + audioPath);
+      await ctx.reply(`[ERR] Audio file not found: ${audioPath}\n\nTip: Use full path or filename in working directory.`);
       return;
     }
     if (!existsSync(videoPath)) {
-      await ctx.reply('[ERR] Video file not found: ' + videoPath);
+      await ctx.reply(`[ERR] Video file not found: ${videoPath}\n\nTip: Use full path or filename in working directory.`);
       return;
     }
     if (isNaN(delayMs)) {
@@ -1690,12 +1793,8 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
   // ===========================================
   registerProcessCommand(bot, logger);
 
-  // Handle unknown commands
-  bot.on('message:text', async (ctx) => {
-    if (ctx.message.text.startsWith('/')) {
-      await ctx.reply('Unknown command. Use /help to see available commands.');
-    }
-  });
+  // NOTE: No handler for unknown commands - bot stays silent to avoid
+  // conflicts with other bots in the same group
 
   logger.info('Bot commands registered');
 }

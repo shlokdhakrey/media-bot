@@ -46,6 +46,11 @@ const envSchema = z.object({
   
   // Google Drive API
   GDRIVE_API_KEY: z.string().default(''),
+  
+  // Binary paths
+  ARIA2C_PATH: z.string().default('aria2c'),
+  FFMPEG_PATH: z.string().default('ffmpeg'),
+  FFPROBE_PATH: z.string().default('ffprobe'),
 });
 
 const parseResult = envSchema.safeParse(process.env);
@@ -85,5 +90,11 @@ export const config = {
   
   gdrive: {
     apiKey: env.GDRIVE_API_KEY,
+  },
+  
+  binaries: {
+    aria2c: env.ARIA2C_PATH,
+    ffmpeg: env.FFMPEG_PATH,
+    ffprobe: env.FFPROBE_PATH,
   },
 } as const;

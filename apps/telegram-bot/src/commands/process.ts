@@ -12,8 +12,9 @@
  * 6. Notifies user with output location
  */
 
-import { existsSync, mkdirSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, unlinkSync, readdirSync } from 'node:fs';
 import { join, basename, extname, dirname } from 'node:path';
+import { spawn } from 'node:child_process';
 import type { Logger } from 'pino';
 import type { Context } from 'grammy';
 import type { BotContext } from '../index.js';
@@ -165,60 +166,13 @@ async function downloadFile(
     }
   }
 
-  // HTTP download using fetch + streaming
+  // HTTP download using aria2c binary for better performance
   if (linkType === 'http') {
     try {
-      onProgress?.(`[DL] Fetching: ${link}`);
+      onProgress?.(`[DL] Starting download: ${link}`);
       
-      const response = await fetch(link);
-      if (!response.ok) {
-        return { success: false, filePath: '', fileName: '', error: `HTTP ${response.status}` };
-      }
-
-      // Extract filename from URL or Content-Disposition
-      let fileName = basename(new URL(link).pathname);
-      const contentDisposition = response.headers.get('content-disposition');
-      if (contentDisposition) {
-        const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (match?.[1]) {
-          fileName = match[1].replace(/['"]/g, '');
-        }
-      }
-      if (!fileName || fileName === '/') {
-        fileName = `download_${Date.now()}`;
-      }
-
-      const filePath = join(outputDir, fileName);
-      const totalBytes = parseInt(response.headers.get('content-length') || '0', 10);
-      
-      if (!response.body) {
-        return { success: false, filePath: '', fileName: '', error: 'No response body' };
-      }
-
-      // Stream to file
-      const fs = await import('node:fs');
-      const { pipeline } = await import('node:stream/promises');
-      const { Readable } = await import('node:stream');
-
-      let downloaded = 0;
-      const transform = new (await import('node:stream')).Transform({
-        transform(chunk, _encoding, callback) {
-          downloaded += chunk.length;
-          if (totalBytes > 0 && downloaded % (1024 * 1024) < chunk.length) {
-            const pct = Math.round((downloaded / totalBytes) * 100);
-            onProgress?.(`[DL] ${fileName}: ${pct}%`);
-          }
-          callback(null, chunk);
-        }
-      });
-
-      const readable = Readable.fromWeb(response.body as any);
-      const writeStream = fs.createWriteStream(filePath);
-      
-      await pipeline(readable, transform, writeStream);
-      
-      logger.info({ url: link, fileName }, 'HTTP download completed');
-      return { success: true, filePath, fileName };
+      const result = await downloadWithAria2c(link, outputDir, logger, onProgress);
+      return result;
 
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
@@ -228,6 +182,130 @@ async function downloadFile(
   }
 
   return { success: false, filePath: '', fileName: '', error: 'Unknown link type' };
+}
+
+/**
+ * Download file using aria2c binary
+ */
+async function downloadWithAria2c(
+  url: string,
+  outputDir: string,
+  logger: Logger,
+  onProgress?: (msg: string) => void
+): Promise<DownloadResult> {
+  return new Promise((resolve) => {
+    const aria2cPath = config.binaries.aria2c;
+    
+    // aria2c arguments for fast downloading
+    const args = [
+      url,
+      '-d', outputDir,               // Output directory
+      '-x', '16',                    // Max connections per server
+      '-s', '16',                    // Split file into 16 pieces
+      '-k', '1M',                    // Min split size
+      '--file-allocation=none',     // Don't pre-allocate
+      '--auto-file-renaming=false', // Don't rename on conflict
+      '--allow-overwrite=true',     // Overwrite if exists
+      '--console-log-level=notice', // Log level
+      '--summary-interval=2',       // Progress interval
+      '--download-result=full',     // Show download result
+    ];
+
+    logger.info({ aria2cPath, url, outputDir }, 'Starting aria2c download');
+    
+    const proc = spawn(aria2cPath, args, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+    let fileName = '';
+    let filePath = '';
+    let lastProgress = '';
+
+    proc.stdout?.on('data', (data: Buffer) => {
+      const text = data.toString();
+      stdout += text;
+      
+      // Parse progress from aria2c output
+      // Example: [#abc123 1.2MiB/10MiB(12%) CN:16 DL:5.2MiB]
+      const progressMatch = text.match(/\[#\w+\s+[\d.]+\w+\/([\d.]+\w+)\((\d+)%\).*?DL:([\d.]+\w+)/);
+      if (progressMatch) {
+        const [, total, percent, speed] = progressMatch;
+        const progressMsg = `[DL] ${percent}% of ${total} (${speed}/s)`;
+        if (progressMsg !== lastProgress) {
+          lastProgress = progressMsg;
+          onProgress?.(progressMsg);
+        }
+      }
+      
+      // Parse filename from output
+      // Example: Download complete: /path/to/file.mkv
+      const completeMatch = text.match(/Download complete:\s*(.+)/);
+      if (completeMatch) {
+        filePath = completeMatch[1].trim();
+        fileName = basename(filePath);
+      }
+      
+      // Also try to get filename from "Downloading X item(s)"
+      const fileMatch = text.match(/\[DL\]\s+(\S+)/);
+      if (fileMatch && !fileName) {
+        fileName = fileMatch[1];
+      }
+    });
+
+    proc.stderr?.on('data', (data: Buffer) => {
+      stderr += data.toString();
+    });
+
+    proc.on('close', (code) => {
+      if (code === 0) {
+        // If we didn't get the filename from output, try to find it in the directory
+        if (!filePath) {
+          try {
+            // Get the most recently modified file in the output directory
+            const files = readdirSync(outputDir)
+              .map(f => ({ name: f, path: join(outputDir, f) }))
+              .filter(f => {
+                try {
+                  const stat = require('fs').statSync(f.path);
+                  return stat.isFile();
+                } catch {
+                  return false;
+                }
+              });
+            
+            if (files.length > 0) {
+              // Find file that matches URL filename or most recent
+              const urlFileName = basename(new URL(url).pathname);
+              const matchingFile = files.find(f => f.name === urlFileName);
+              if (matchingFile) {
+                filePath = matchingFile.path;
+                fileName = matchingFile.name;
+              }
+            }
+          } catch (e) {
+            logger.warn({ error: e }, 'Could not determine downloaded file');
+          }
+        }
+        
+        if (filePath && existsSync(filePath)) {
+          logger.info({ url, filePath, fileName }, 'aria2c download completed');
+          resolve({ success: true, filePath, fileName });
+        } else {
+          resolve({ success: false, filePath: '', fileName: '', error: 'Download completed but file not found' });
+        }
+      } else {
+        logger.error({ code, stderr }, 'aria2c download failed');
+        resolve({ success: false, filePath: '', fileName: '', error: stderr || `aria2c exited with code ${code}` });
+      }
+    });
+
+    proc.on('error', (error) => {
+      logger.error({ error }, 'aria2c process error - is aria2c installed?');
+      resolve({ success: false, filePath: '', fileName: '', error: `aria2c not found or failed: ${error.message}` });
+    });
+  });
 }
 
 /**
