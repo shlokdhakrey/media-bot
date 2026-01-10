@@ -914,7 +914,10 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     if (args.length < 2) {
       await ctx.reply(
         `*🎯 Professional Sync Analysis*\n\n` +
-        `Usage: \`/sync <video> <audio> [title] [--deep]\`\n\n` +
+        `Usage: \`/sync <reference> <target> [title] [--deep]\`\n\n` +
+        `*Modes:*\n` +
+        `• Video + Audio: Compare video's audio track with external audio\n` +
+        `• Audio + Audio: Compare two audio files directly\n\n` +
         `*Quick Mode (default):* Analyzes first 5 minutes (~10-30 sec)\n` +
         `*Deep Mode (--deep):* Analyzes entire file (~5-15 min)\n\n` +
         `This command:\n` +
@@ -925,7 +928,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         `5. Provides correction commands\n\n` +
         `Examples:\n` +
         `\`/sync "Movie.mkv" "Hindi.mp4" "HS DDP 5.1"\`\n` +
-        `\`/sync "Movie.mkv" "Hindi.mp4" --deep\``,
+        `\`/sync "English.mp3" "Hindi.mp3" --deep\``,
         { parse_mode: 'Markdown' }
       );
       return;
@@ -951,30 +954,36 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
     try {
       // Phase 1: Basic media analysis
       const analyzer = new MediaAnalyzer();
-      const [videoResult, audioResult] = await Promise.all([
-        analyzer.analyze(videoPath),
-        analyzer.analyze(audioPath),
+      const [refResult, targetResult] = await Promise.all([
+        analyzer.analyze(videoPath),  // Can be video or audio (reference)
+        analyzer.analyze(audioPath),  // Target audio to sync
       ]);
 
-      const videoMeta = videoResult.metadata;
-      const audioMeta = audioResult.metadata;
+      const refMeta = refResult.metadata;
+      const targetMeta = targetResult.metadata;
       
-      const videoStream = videoMeta.videoStreams[0];
-      const audioStream = audioMeta.audioStreams[0];
+      // Check for audio streams in both files
+      const refAudioStream = refMeta.audioStreams[0];
+      const targetAudioStream = targetMeta.audioStreams[0];
+      const refVideoStream = refMeta.videoStreams[0];
       
-      if (!videoStream) {
-        await ctx.api.editMessageText(ctx.chat!.id, progressMsg.message_id, '[ERR] No video stream found');
+      // Determine if this is video+audio or audio+audio comparison
+      const isAudioToAudio = !refVideoStream && refAudioStream;
+      
+      if (!refAudioStream) {
+        await ctx.api.editMessageText(ctx.chat!.id, progressMsg.message_id, '[ERR] No audio stream found in reference file');
         return;
       }
-      if (!audioStream) {
-        await ctx.api.editMessageText(ctx.chat!.id, progressMsg.message_id, '[ERR] No audio stream found');
+      if (!targetAudioStream) {
+        await ctx.api.editMessageText(ctx.chat!.id, progressMsg.message_id, '[ERR] No audio stream found in target file');
         return;
       }
 
+      const modeLabel = isAudioToAudio ? 'Audio-to-Audio' : 'Video-to-Audio';
       await ctx.api.editMessageText(ctx.chat!.id, progressMsg.message_id, 
         deepMode 
-          ? '🔍 Files analyzed...\n🎵 Running DEEP waveform analysis (full file, may take 5-15 min)...'
-          : '🔍 Files analyzed...\n🎵 Running quick sync analysis (first 5 min, ~10-30 sec)...');
+          ? `🔍 ${modeLabel} mode...\n🎵 Running DEEP waveform analysis (full file, may take 5-15 min)...`
+          : `🔍 ${modeLabel} mode...\n🎵 Running quick sync analysis (first 5 min, ~10-30 sec)...`);
 
       // Phase 2: Professional sync analysis using waveform comparison
       // Quick mode (default): analyze first 5 minutes only
@@ -999,11 +1008,11 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       }
 
       // Calculate sync parameters (basic method as fallback)
-      const videoFps = videoStream.fps;
-      const audioDuration = audioMeta.duration;
-      const videoDuration = videoMeta.duration;
+      const refFps = refVideoStream?.fps ?? 23.976; // Use 23.976 for audio-only
+      const targetDuration = targetMeta.duration;
+      const refDuration = refMeta.duration;
       
-      const rawDiff = videoDuration - audioDuration;
+      const rawDiff = refDuration - targetDuration;
       
       // Detect audio FPS from duration ratio
       let detectedAudioFps = 24;
@@ -1014,14 +1023,14 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
         { from: 25, to: 24, ratio: 25 / 24 },
       ];
 
-      let projectedDuration = audioDuration;
+      let projectedDuration = targetDuration;
       let fpsConversionNeeded = false;
       let tempoFactor = 1.0;
 
       for (const fpsRatio of fpsRatios) {
-        const projected = audioDuration * fpsRatio.ratio;
-        const diff = Math.abs(projected - videoDuration);
-        if (diff < Math.abs(projectedDuration - videoDuration)) {
+        const projected = targetDuration * fpsRatio.ratio;
+        const diff = Math.abs(projected - refDuration);
+        if (diff < Math.abs(projectedDuration - refDuration)) {
           projectedDuration = projected;
           detectedAudioFps = fpsRatio.from;
           tempoFactor = fpsRatio.ratio;
@@ -1030,7 +1039,7 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       }
 
       // Use professional delay if available, otherwise calculate from duration
-      const projectedDiff = videoDuration - projectedDuration;
+      const projectedDiff = refDuration - projectedDuration;
       let delayMs = usedProfessional && professionalResult 
         ? professionalResult.globalDelayMs 
         : Math.round(projectedDiff * 1000);
@@ -1061,10 +1070,19 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
 
       let report = `*MEDIA SYNC REPORT*\n`;
       report += `----------------------------\n`;
-      report += `[VIDEO] \`${videoMeta.fileName}\` (${formatSize(videoMeta.fileSize)})\n`;
-      report += `   - Stream: ${videoFps.toFixed(3)} \\[${formatDur(videoDuration)}\\]\n\n`;
-      report += `[AUDIO] \`${audioMeta.fileName}\` (${formatSize(audioMeta.fileSize)})\n`;
-      report += `   - Stream: ${detectedAudioFps} \\[${formatDur(audioDuration)}\\]\n`;
+      
+      // Reference file (video or audio)
+      if (isAudioToAudio) {
+        report += `[REF] \`${refMeta.fileName}\` (${formatSize(refMeta.fileSize)})\n`;
+        report += `   - Audio: ${refAudioStream.channels}ch ${refAudioStream.codec} \\[${formatDur(refDuration)}\\]\n\n`;
+      } else {
+        report += `[VIDEO] \`${refMeta.fileName}\` (${formatSize(refMeta.fileSize)})\n`;
+        report += `   - Stream: ${refFps.toFixed(3)} fps \\[${formatDur(refDuration)}\\]\n\n`;
+      }
+      
+      // Target audio file
+      report += `[TARGET] \`${targetMeta.fileName}\` (${formatSize(targetMeta.fileSize)})\n`;
+      report += `   - Audio: ${targetAudioStream.channels}ch ${targetAudioStream.codec} \\[${formatDur(targetDuration)}\\]\n`;
       if (title) report += `   - Title: ${title}\n`;
       report += `----------------------------\n\n`;
 
@@ -1093,24 +1111,28 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       report += `*RAW DATA CHECK*\n\n`;
       report += `\`Stream        FPS     Duration\`\n`;
       report += `\`------------  ------  --------------\`\n`;
-      report += `\`Video       : ${videoFps.toFixed(3).padEnd(6)} ${formatDur(videoDuration)}\`\n`;
-      report += `\`Audio (Raw) : ${detectedAudioFps.toString().padEnd(6)} ${formatDur(audioDuration)}\`\n`;
+      if (isAudioToAudio) {
+        report += `\`Reference   : N/A    ${formatDur(refDuration)}\`\n`;
+      } else {
+        report += `\`Video       : ${refFps.toFixed(3).padEnd(6)} ${formatDur(refDuration)}\`\n`;
+      }
+      report += `\`Target (Raw): ${detectedAudioFps.toString().padEnd(6)} ${formatDur(targetDuration)}\`\n`;
       report += `\`Raw Diff    :         ${formatDur(Math.abs(rawDiff))}\`\n\n`;
 
-      if (fpsConversionNeeded) {
+      if (fpsConversionNeeded && !isAudioToAudio) {
         report += `*PROJECTED SYNC CHECK*\n\n`;
         report += `\`Stream        FPS     Duration\`\n`;
         report += `\`------------  ------  --------------\`\n`;
-        report += `\`Video Data  : ${videoFps.toFixed(3).padEnd(6)} ${formatDur(videoDuration)}\`\n`;
-        report += `\`Audio Data  : ${videoFps.toFixed(3).padEnd(6)} ${formatDur(projectedDuration)}\`\n`;
+        report += `\`Video Data  : ${refFps.toFixed(3).padEnd(6)} ${formatDur(refDuration)}\`\n`;
+        report += `\`Audio Data  : ${refFps.toFixed(3).padEnd(6)} ${formatDur(projectedDuration)}\`\n`;
         report += `\`Difference  :         ${formatDur(Math.abs(projectedDiff))}\`\n\n`;
       }
 
       // Actions needed
       const actions: string[] = [];
-      if (fpsConversionNeeded) {
-        actions.push(`1. Convert Audio: ${detectedAudioFps} -> ${videoFps.toFixed(3)}`);
-        actions.push(`   \`/fps ${detectedAudioFps} ${videoFps.toFixed(3)} "${audioPath}" "output.mka"\``);
+      if (fpsConversionNeeded && !isAudioToAudio) {
+        actions.push(`1. Convert Audio: ${detectedAudioFps} -> ${refFps.toFixed(3)}`);
+        actions.push(`   \`/fps ${detectedAudioFps} ${refFps.toFixed(3)} "${audioPath}" "output.mka"\``);
       }
       if (Math.abs(delayMs) > 10) {
         actions.push(`${actions.length + 1}. Add Delay: ${delayMs} ms`);

@@ -211,6 +211,7 @@ export class AudioSyncAnalyzer {
     methodsUsed.push('silence_detection');
 
     // Step 2: Cross-correlation analysis (primary method)
+    // Use more segments for better multi-point consensus
     let correlationResult: CrossCorrelationResult | null = null;
     try {
       correlationResult = await this.crossCorrelation.analyze(
@@ -218,8 +219,9 @@ export class AudioSyncAnalyzer {
         targetFile,
         {
           maxOffsetSec: this.options.maxOffsetSec,
-          windowSizeSec: this.options.deepAnalysis ? 5 : 10,
-          stepSizeSec: this.options.deepAnalysis ? 2 : 5,
+          // Smaller windows = more segments = better consensus
+          windowSizeSec: this.options.deepAnalysis ? 3 : 5,
+          stepSizeSec: this.options.deepAnalysis ? 1 : 2,
           analyzeDurationSec: this.options.analyzeDurationSec,
         }
       );
@@ -371,26 +373,53 @@ export class AudioSyncAnalyzer {
       }
     }
 
-    // Calculate global delay as weighted average of methods
+    // ============================================
+    // MULTI-POINT CONSENSUS ALGORITHM
+    // ============================================
+    // Instead of trusting a single global correlation, find the
+    // MOST COMMON delay among high-confidence segments.
+    // This handles audio with cuts/insertions properly.
+    
+    // Step 1: Collect all segment delays with confidence > threshold
+    const confidentSegments = segments.filter(s => s.confidence > 0.4);
+    
+    // Step 2: Use histogram/clustering to find the consensus delay
+    // Group delays into 50ms buckets and find the most common bucket
+    const consensusDelay = this.findConsensusDelay(confidentSegments);
+    
+    // Step 3: Calculate global delay
+    // Prefer consensus if we have enough segments, otherwise use weighted average
     let globalDelayMs = 0;
     let totalWeight = 0;
+    
+    if (consensusDelay.confidence > 0.5 && consensusDelay.segmentCount >= 3) {
+      // Use consensus from multiple matching segments
+      globalDelayMs = consensusDelay.delayMs;
+      totalWeight = 1;
+      logger.info({
+        consensusDelayMs: consensusDelay.delayMs,
+        segmentCount: consensusDelay.segmentCount,
+        confidence: consensusDelay.confidence,
+      }, 'Using multi-point consensus delay');
+    } else {
+      // Fallback to weighted average of methods
+      if (correlation && correlation.globalConfidence > 0.3) {
+        globalDelayMs += correlation.globalDelayMs * correlation.globalConfidence * 2;
+        totalWeight += correlation.globalConfidence * 2;
+      }
 
-    if (correlation && correlation.globalConfidence > 0.3) {
-      globalDelayMs += correlation.globalDelayMs * correlation.globalConfidence * 2;
-      totalWeight += correlation.globalConfidence * 2;
+      if (peaks && peaks.confidence > 0.3) {
+        globalDelayMs += peaks.averageOffsetMs * peaks.confidence;
+        totalWeight += peaks.confidence;
+      }
+
+      if (fingerprint?.bestMatch && fingerprint.bestMatch.confidence > 0.3) {
+        globalDelayMs += fingerprint.bestMatch.delayMs * fingerprint.bestMatch.confidence;
+        totalWeight += fingerprint.bestMatch.confidence;
+      }
+      
+      globalDelayMs = totalWeight > 0 ? globalDelayMs / totalWeight : 0;
     }
-
-    if (peaks && peaks.confidence > 0.3) {
-      globalDelayMs += peaks.averageOffsetMs * peaks.confidence;
-      totalWeight += peaks.confidence;
-    }
-
-    if (fingerprint?.bestMatch && fingerprint.bestMatch.confidence > 0.3) {
-      globalDelayMs += fingerprint.bestMatch.delayMs * fingerprint.bestMatch.confidence;
-      totalWeight += fingerprint.bestMatch.confidence;
-    }
-
-    globalDelayMs = totalWeight > 0 ? globalDelayMs / totalWeight : 0;
 
     // Determine overall confidence
     const confidences = [
@@ -558,6 +587,105 @@ export class AudioSyncAnalyzer {
       },
       isSafe: analysis.confidence > 0.7 && Math.abs(analysis.globalDelayMs) < 5000,
       warnings,
+    };
+  }
+
+  /**
+   * Find consensus delay using histogram clustering
+   * 
+   * This is the key to accurate sync detection with cuts/insertions:
+   * 1. Group segment delays into buckets (50ms resolution)
+   * 2. Find the bucket with the most segments
+   * 3. Calculate weighted average within that bucket
+   * 
+   * This way, if 10 segments agree on ~25ms delay and 3 segments
+   * show ~400ms (due to cuts), we pick 25ms as the consensus.
+   */
+  private findConsensusDelay(
+    segments: SyncSegment[]
+  ): { delayMs: number; confidence: number; segmentCount: number } {
+    if (segments.length === 0) {
+      return { delayMs: 0, confidence: 0, segmentCount: 0 };
+    }
+
+    if (segments.length === 1) {
+      return { 
+        delayMs: segments[0]!.delayMs, 
+        confidence: segments[0]!.confidence, 
+        segmentCount: 1 
+      };
+    }
+
+    // Bucket size in ms (50ms resolution)
+    const bucketSize = 50;
+    
+    // Create histogram of delays
+    const histogram = new Map<number, { delays: number[]; confidences: number[] }>();
+    
+    for (const seg of segments) {
+      const bucket = Math.round(seg.delayMs / bucketSize) * bucketSize;
+      
+      if (!histogram.has(bucket)) {
+        histogram.set(bucket, { delays: [], confidences: [] });
+      }
+      
+      const entry = histogram.get(bucket)!;
+      entry.delays.push(seg.delayMs);
+      entry.confidences.push(seg.confidence);
+    }
+
+    // Find the bucket with the most segments (weighted by confidence)
+    let bestBucket = 0;
+    let bestScore = 0;
+    
+    for (const [bucket, entry] of histogram) {
+      // Score = count * average confidence
+      const avgConfidence = entry.confidences.reduce((a, b) => a + b, 0) / entry.confidences.length;
+      const score = entry.delays.length * avgConfidence;
+      
+      if (score > bestScore) {
+        bestScore = score;
+        bestBucket = bucket;
+      }
+    }
+
+    // Get the winning bucket
+    const winner = histogram.get(bestBucket);
+    if (!winner || winner.delays.length === 0) {
+      return { delayMs: 0, confidence: 0, segmentCount: 0 };
+    }
+
+    // Calculate weighted average delay within the winning bucket
+    let weightedSum = 0;
+    let totalConfidence = 0;
+    
+    for (let i = 0; i < winner.delays.length; i++) {
+      const delay = winner.delays[i]!;
+      const conf = winner.confidences[i]!;
+      weightedSum += delay * conf;
+      totalConfidence += conf;
+    }
+
+    const consensusDelay = totalConfidence > 0 ? weightedSum / totalConfidence : bestBucket;
+    
+    // Confidence based on how many segments agree vs total
+    const agreementRatio = winner.delays.length / segments.length;
+    const avgConfidence = totalConfidence / winner.delays.length;
+    const confidence = agreementRatio * avgConfidence;
+
+    logger.debug({
+      totalSegments: segments.length,
+      bucketsFound: histogram.size,
+      winningBucket: bestBucket,
+      segmentsInBucket: winner.delays.length,
+      consensusDelay: Math.round(consensusDelay),
+      confidence,
+    }, 'Consensus delay calculation');
+
+    return {
+      delayMs: Math.round(consensusDelay),
+      confidence,
+      segmentCount: winner.delays.length,
     };
   }
 }
