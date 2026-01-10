@@ -901,23 +901,31 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
   // SYNC & PROCESSING COMMANDS
   // ===========================================
 
-  // /sync <video> <audio> [title] - Professional Sync analysis & report
+  // /sync <video> <audio> [title] [--deep] - Professional Sync analysis & report
   bot.command('sync', async (ctx) => {
     const text = ctx.message?.text ?? '';
-    const args = parseQuotedArgs(text.slice('/sync'.length).trim());
+    const rawArgs = text.slice('/sync'.length).trim();
+    
+    // Check for --deep flag
+    const deepMode = rawArgs.includes('--deep');
+    const argsWithoutFlags = rawArgs.replace(/--deep/g, '').trim();
+    const args = parseQuotedArgs(argsWithoutFlags);
     
     if (args.length < 2) {
       await ctx.reply(
         `*🎯 Professional Sync Analysis*\n\n` +
-        `Usage: \`/sync <video> <audio> [title]\`\n\n` +
+        `Usage: \`/sync <video> <audio> [title] [--deep]\`\n\n` +
+        `*Quick Mode (default):* Analyzes first 5 minutes (~10-30 sec)\n` +
+        `*Deep Mode (--deep):* Analyzes entire file (~5-15 min)\n\n` +
         `This command:\n` +
         `1. Analyzes both files\n` +
         `2. Runs waveform comparison (like Audacity)\n` +
         `3. Detects exact delay using cross-correlation\n` +
         `4. Identifies drift and structural changes\n` +
         `5. Provides correction commands\n\n` +
-        `Example:\n` +
-        `\`/sync "Movie.mkv" "Hindi.mp4" "HS DDP 5.1"\``,
+        `Examples:\n` +
+        `\`/sync "Movie.mkv" "Hindi.mp4" "HS DDP 5.1"\`\n` +
+        `\`/sync "Movie.mkv" "Hindi.mp4" --deep\``,
         { parse_mode: 'Markdown' }
       );
       return;
@@ -964,14 +972,20 @@ export function registerCommands(bot: Bot<BotContext>, logger: Logger): void {
       }
 
       await ctx.api.editMessageText(ctx.chat!.id, progressMsg.message_id, 
-        '🔍 Files analyzed...\n🎵 Running professional waveform analysis (this may take a moment)...');
+        deepMode 
+          ? '🔍 Files analyzed...\n🎵 Running DEEP waveform analysis (full file, may take 5-15 min)...'
+          : '🔍 Files analyzed...\n🎵 Running quick sync analysis (first 5 min, ~10-30 sec)...');
 
       // Phase 2: Professional sync analysis using waveform comparison
+      // Quick mode (default): analyze first 5 minutes only
+      // Deep mode (--deep): analyze entire file
       const syncAnalyzer = new AudioSyncAnalyzer({
-        useFingerprinting: true,
-        deepAnalysis: true, // Full analysis for /sync command
+        useFingerprinting: false, // Skip fingerprinting in quick mode for speed
+        deepAnalysis: deepMode,
         maxOffsetSec: 60,
         minConfidence: 0.3,
+        // Quick mode: 5 minutes (300s), Deep mode: undefined (full file)
+        analyzeDurationSec: deepMode ? undefined : 300,
       });
 
       let professionalResult: ProfessionalSyncResult | undefined;

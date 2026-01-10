@@ -378,10 +378,11 @@ async function analyzeSync(
       logger.info('Running professional audio sync analysis (waveform comparison)...');
       
       const syncAnalyzer = new AudioSyncAnalyzer({
-        useFingerprinting: true,
-        deepAnalysis: false, // Use fast mode for initial analysis
+        useFingerprinting: false, // Skip fingerprinting for speed
+        deepAnalysis: false, // Quick mode (analyze first 5 minutes only)
         maxOffsetSec: 30,
         minConfidence: 0.5,
+        analyzeDurationSec: 300, // 5 minutes - sufficient for sync detection
       });
 
       // Extract audio from video for comparison

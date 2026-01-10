@@ -146,14 +146,21 @@ export interface SyncAnalyzerOptions {
   useFingerprinting?: boolean;
   /** Deep analysis mode (slower, more accurate) */
   deepAnalysis?: boolean;
+  /** Limit analysis to first N seconds (quick mode: 300 = 5 min) */
+  analyzeDurationSec?: number;
 }
+
+// Internal options type where analyzeDurationSec can be undefined (for full analysis)
+type InternalSyncOptions = Omit<Required<SyncAnalyzerOptions>, 'analyzeDurationSec'> & {
+  analyzeDurationSec: number | undefined;
+};
 
 export class AudioSyncAnalyzer {
   private crossCorrelation: CrossCorrelationEngine;
   private peakDetector: PeakDetector;
   private fingerprinter: AudioFingerprintAnalyzer;
   private silenceDetector: SilenceDetector;
-  private options: Required<SyncAnalyzerOptions>;
+  private options: InternalSyncOptions;
 
   constructor(options: SyncAnalyzerOptions = {}) {
     const ffmpegPath = options.ffmpegPath ?? 'ffmpeg';
@@ -167,6 +174,8 @@ export class AudioSyncAnalyzer {
       minConfidence: options.minConfidence ?? 0.5,
       useFingerprinting: options.useFingerprinting ?? true,
       deepAnalysis: options.deepAnalysis ?? false,
+      // Quick mode: 5 minutes (300s). Set to undefined for full analysis.
+      analyzeDurationSec: options.analyzeDurationSec ?? (options.deepAnalysis ? undefined : 300),
     };
 
     this.crossCorrelation = new CrossCorrelationEngine({ ffmpegPath, tempDir });
@@ -211,6 +220,7 @@ export class AudioSyncAnalyzer {
           maxOffsetSec: this.options.maxOffsetSec,
           windowSizeSec: this.options.deepAnalysis ? 5 : 10,
           stepSizeSec: this.options.deepAnalysis ? 2 : 5,
+          analyzeDurationSec: this.options.analyzeDurationSec,
         }
       );
       methodsUsed.push('cross_correlation');

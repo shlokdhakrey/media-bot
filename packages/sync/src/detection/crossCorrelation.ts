@@ -102,24 +102,28 @@ export class CrossCorrelationEngine {
       analysisSampleRate?: number;
       /** Extract audio from video file? */
       extractFromVideo?: boolean;
+      /** Limit analysis to first N seconds (quick mode) */
+      analyzeDurationSec?: number;
     } = {}
   ): Promise<CrossCorrelationResult> {
     const maxOffsetSec = options.maxOffsetSec ?? 30;
     const windowSizeSec = options.windowSizeSec ?? 10;
     const stepSizeSec = options.stepSizeSec ?? 5;
     const analysisSampleRate = options.analysisSampleRate ?? 8000;
+    const analyzeDurationSec = options.analyzeDurationSec;
 
     logger.info({
       referenceFile,
       targetFile,
       maxOffsetSec,
       windowSizeSec,
+      analyzeDurationSec: analyzeDurationSec ?? 'full',
     }, 'Starting cross-correlation analysis');
 
     // Extract waveforms
     const [refWaveform, targetWaveform] = await Promise.all([
-      this.extractWaveform(referenceFile, analysisSampleRate, options.extractFromVideo),
-      this.extractWaveform(targetFile, analysisSampleRate, options.extractFromVideo),
+      this.extractWaveform(referenceFile, analysisSampleRate, options.extractFromVideo, analyzeDurationSec),
+      this.extractWaveform(targetFile, analysisSampleRate, options.extractFromVideo, analyzeDurationSec),
     ]);
 
     logger.debug({
@@ -166,11 +170,13 @@ export class CrossCorrelationEngine {
 
   /**
    * Extract audio waveform from file
+   * @param durationSec - Optional: limit extraction to first N seconds (for quick mode)
    */
   private async extractWaveform(
     filePath: string,
     sampleRate: number,
-    extractFromVideo: boolean = false
+    extractFromVideo: boolean = false,
+    durationSec?: number
   ): Promise<WaveformData> {
     const tempFile = path.join(this.tempDir, `waveform_${Date.now()}_${Math.random().toString(36).slice(2)}.raw`);
 
@@ -178,6 +184,14 @@ export class CrossCorrelationEngine {
       // Extract audio as raw PCM
       const args = [
         '-i', filePath,
+      ];
+      
+      // Add duration limit for quick mode (analyze only first N seconds)
+      if (durationSec && durationSec > 0) {
+        args.push('-t', durationSec.toString());
+      }
+      
+      args.push(
         '-vn', // No video
         '-ac', '1', // Mono
         '-ar', sampleRate.toString(),
@@ -185,7 +199,7 @@ export class CrossCorrelationEngine {
         '-acodec', 'pcm_s16le',
         '-y',
         tempFile,
-      ];
+      );
 
       await executeCommand(this.ffmpegPath, args, {
         timeout: 300000,
