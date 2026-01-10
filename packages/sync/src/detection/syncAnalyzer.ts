@@ -374,51 +374,70 @@ export class AudioSyncAnalyzer {
     }
 
     // ============================================
-    // MULTI-POINT CONSENSUS ALGORITHM
+    // DELAY DETECTION STRATEGY
     // ============================================
-    // Instead of trusting a single global correlation, find the
-    // MOST COMMON delay among high-confidence segments.
-    // This handles audio with cuts/insertions properly.
+    // 1. If global correlation has high confidence (>0.6), use it directly
+    //    The global correlation uses the ENTIRE waveform which is most reliable
+    // 2. If global is low confidence, use segment consensus
+    // 3. Segment analysis is used to detect DRIFT and CUTS, not primary delay
     
-    // Step 1: Collect all segment delays with confidence > threshold
-    const confidentSegments = segments.filter(s => s.confidence > 0.4);
-    
-    // Step 2: Use histogram/clustering to find the consensus delay
-    // Group delays into 50ms buckets and find the most common bucket
-    const consensusDelay = this.findConsensusDelay(confidentSegments);
-    
-    // Step 3: Calculate global delay
-    // Prefer consensus if we have enough segments, otherwise use weighted average
     let globalDelayMs = 0;
     let totalWeight = 0;
+    let usedMethod = 'none';
     
-    if (consensusDelay.confidence > 0.5 && consensusDelay.segmentCount >= 3) {
-      // Use consensus from multiple matching segments
-      globalDelayMs = consensusDelay.delayMs;
+    // Strategy 1: Trust global correlation if it's strong
+    if (correlation && correlation.globalConfidence > 0.6) {
+      globalDelayMs = correlation.globalDelayMs;
       totalWeight = 1;
+      usedMethod = 'global_correlation';
       logger.info({
-        consensusDelayMs: consensusDelay.delayMs,
-        segmentCount: consensusDelay.segmentCount,
-        confidence: consensusDelay.confidence,
-      }, 'Using multi-point consensus delay');
-    } else {
-      // Fallback to weighted average of methods
-      if (correlation && correlation.globalConfidence > 0.3) {
-        globalDelayMs += correlation.globalDelayMs * correlation.globalConfidence * 2;
-        totalWeight += correlation.globalConfidence * 2;
-      }
-
-      if (peaks && peaks.confidence > 0.3) {
-        globalDelayMs += peaks.averageOffsetMs * peaks.confidence;
-        totalWeight += peaks.confidence;
-      }
-
-      if (fingerprint?.bestMatch && fingerprint.bestMatch.confidence > 0.3) {
-        globalDelayMs += fingerprint.bestMatch.delayMs * fingerprint.bestMatch.confidence;
-        totalWeight += fingerprint.bestMatch.confidence;
-      }
+        globalDelayMs: correlation.globalDelayMs,
+        globalConfidence: correlation.globalConfidence,
+      }, 'Using global correlation (high confidence)');
+    } 
+    // Strategy 2: Use segment consensus if we have enough agreeing segments
+    else {
+      const confidentSegments = segments.filter(s => s.confidence > 0.3);
+      const consensusDelay = this.findConsensusDelay(confidentSegments);
+      const minSegmentsForConsensus = Math.max(5, Math.floor(confidentSegments.length * 0.1));
       
-      globalDelayMs = totalWeight > 0 ? globalDelayMs / totalWeight : 0;
+      if (consensusDelay.segmentCount >= minSegmentsForConsensus) {
+        globalDelayMs = consensusDelay.delayMs;
+        totalWeight = 1;
+        usedMethod = 'segment_consensus';
+        logger.info({
+          consensusDelayMs: consensusDelay.delayMs,
+          segmentCount: consensusDelay.segmentCount,
+          totalSegments: confidentSegments.length,
+          minRequired: minSegmentsForConsensus,
+        }, 'Using segment consensus delay');
+      }
+      // Strategy 3: Weighted average fallback
+      else {
+        usedMethod = 'weighted_average';
+        logger.info({
+          segmentCount: consensusDelay.segmentCount,
+          minRequired: minSegmentsForConsensus,
+          globalConfidence: correlation?.globalConfidence,
+        }, 'Using weighted average (low confidence)');
+        
+        if (correlation && correlation.globalConfidence > 0.2) {
+          globalDelayMs += correlation.globalDelayMs * correlation.globalConfidence * 2;
+          totalWeight += correlation.globalConfidence * 2;
+        }
+
+        if (peaks && peaks.confidence > 0.3) {
+          globalDelayMs += peaks.averageOffsetMs * peaks.confidence;
+          totalWeight += peaks.confidence;
+        }
+
+        if (fingerprint?.bestMatch && fingerprint.bestMatch.confidence > 0.3) {
+          globalDelayMs += fingerprint.bestMatch.delayMs * fingerprint.bestMatch.confidence;
+          totalWeight += fingerprint.bestMatch.confidence;
+        }
+        
+        globalDelayMs = totalWeight > 0 ? globalDelayMs / totalWeight : 0;
+      }
     }
 
     // Determine overall confidence
@@ -620,13 +639,13 @@ export class AudioSyncAnalyzer {
     const bucketSize = 50;
     
     // Create histogram of delays
-    const histogram = new Map<number, { delays: number[]; confidences: number[] }>();
+    const histogram = new Map<number, { delays: number[]; confidences: number[]; sign: number }>();
     
     for (const seg of segments) {
       const bucket = Math.round(seg.delayMs / bucketSize) * bucketSize;
       
       if (!histogram.has(bucket)) {
-        histogram.set(bucket, { delays: [], confidences: [] });
+        histogram.set(bucket, { delays: [], confidences: [], sign: Math.sign(seg.delayMs) || 1 });
       }
       
       const entry = histogram.get(bucket)!;
@@ -635,18 +654,43 @@ export class AudioSyncAnalyzer {
     }
 
     // Find the bucket with the most segments (weighted by confidence)
+    // Prefer smaller absolute delays when scores are close (within 20%)
     let bestBucket = 0;
     let bestScore = 0;
+    let bestAbsDelay = Infinity;
+    
+    // Collect all bucket scores first
+    const bucketScores: Array<{ bucket: number; score: number; absDelay: number }> = [];
     
     for (const [bucket, entry] of histogram) {
-      // Score = count * average confidence
       const avgConfidence = entry.confidences.reduce((a, b) => a + b, 0) / entry.confidences.length;
       const score = entry.delays.length * avgConfidence;
+      bucketScores.push({ bucket, score, absDelay: Math.abs(bucket) });
+    }
+    
+    // Sort by score descending
+    bucketScores.sort((a, b) => b.score - a.score);
+    
+    // Get best score
+    if (bucketScores.length > 0) {
+      const topScore = bucketScores[0]!.score;
       
-      if (score > bestScore) {
-        bestScore = score;
-        bestBucket = bucket;
-      }
+      // Among buckets within 30% of top score, prefer the smallest absolute delay
+      // This handles the case where +3000ms and -3000ms both have high scores
+      // but the actual delay is likely much smaller
+      const competingBuckets = bucketScores.filter(b => b.score >= topScore * 0.7);
+      competingBuckets.sort((a, b) => a.absDelay - b.absDelay);
+      
+      const chosen = competingBuckets[0]!;
+      bestBucket = chosen.bucket;
+      bestScore = chosen.score;
+      bestAbsDelay = chosen.absDelay;
+      
+      logger.debug({
+        topBuckets: bucketScores.slice(0, 5).map(b => ({ bucket: b.bucket, score: b.score.toFixed(2) })),
+        chosenBucket: bestBucket,
+        reason: competingBuckets.length > 1 ? 'smallest_abs_delay' : 'highest_score',
+      }, 'Bucket selection');
     }
 
     // Get the winning bucket

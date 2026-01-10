@@ -141,6 +141,11 @@ export class CrossCorrelationEngine {
       maxOffsetSec
     );
 
+    logger.info({
+      globalDelayMs: globalResult.delayMs,
+      globalConfidence: globalResult.confidence,
+    }, 'Global cross-correlation result (full waveform)');
+
     // Segment-by-segment analysis
     const segments = await this.analyzeSegments(
       refWaveform,
